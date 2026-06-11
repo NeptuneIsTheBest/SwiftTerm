@@ -725,6 +725,7 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     }
     
     open func bufferActivated(source: Terminal) {
+        selection.selectNone()
         updateScroller ()
     }
     
@@ -760,10 +761,6 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     }
     
     open func linefeed(source: Terminal) {
-        // Preserve manual selection while output is streaming when mouse reporting is disabled.
-        if allowMouseReporting {
-            selection.selectNone()
-        }
     }
     
     /// This vaiable controls whether mouse events are sent to the application running under the
@@ -804,8 +801,6 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         scroller.knobProportion = scrollThumbsize
     }
     
-    var userScrolling = false
-
     override open func viewWillDraw() {
         
         // Starting with BigSur, it looks like even sending one pixel to be redrawn will trigger

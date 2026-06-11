@@ -1760,7 +1760,6 @@ extension TerminalView {
     
     public func scroll (toPosition: Double)
     {
-        userScrolling = true
         let displayBuffer = terminal.displayBuffer
         let oldPosition = displayBuffer.yDisp
         
@@ -1777,14 +1776,14 @@ extension TerminalView {
         if newScrollPosition != oldPosition {
             scrollTo(row: newScrollPosition)
         }
-        userScrolling = false
     }
     
     public func scrollTo (row: Int, notifyAccessibility: Bool = true)
     {
+        let oldPosition = terminal.displayBuffer.yDisp
+        terminal.setViewYDisp (row, userInitiated: true)
         let displayBuffer = terminal.displayBuffer
-        if row != displayBuffer.yDisp {
-            terminal.setViewYDisp (row)
+        if displayBuffer.yDisp != oldPosition {
             
             // tell the terminal we want to refresh all the rows
             terminal.refresh (startRow: 0, endRow: terminal.rows)
@@ -1836,10 +1835,6 @@ extension TerminalView {
     func feedPrepare()
     {
         search.invalidate()
-        // Preserve manual selection while output is streaming when mouse reporting is disabled.
-        if allowMouseReporting {
-            selection.active = false
-        }
         startDisplayUpdates()
     }
     

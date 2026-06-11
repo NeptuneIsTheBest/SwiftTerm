@@ -801,6 +801,7 @@ open class Terminal {
             altBuffer.clear ()
         }
         buffer = normalBuffer
+        syncUserScrollingWithViewport()
     }
     
     private func activateAltBuffer(fillAttr: Attribute?) {
@@ -815,6 +816,7 @@ open class Terminal {
         
         altBuffer.fillViewportRows(attribute: fillAttr)
         buffer = altBuffer
+        syncUserScrollingWithViewport()
         clearKittyImages(in: altBuffer, isAlternateBuffer: true)
     }
     
@@ -2446,6 +2448,7 @@ open class Terminal {
                 buffer.yBase = max (buffer.yBase - scrollBackSize, 0)
                 buffer.yDisp = max (buffer.yDisp - scrollBackSize, 0)
             }
+            syncUserScrollingWithViewport()
             break;
         default:
             break
@@ -5185,6 +5188,7 @@ open class Terminal {
         setup (isReset: true)
         clearAllKittyImages()
         cursorHidden = savedCursorHidden
+        syncUserScrollingWithViewport()
         refresh (startRow: 0, endRow: rows-1)
         syncScrollArea ()
     }
@@ -5505,6 +5509,7 @@ open class Terminal {
         options.rows = newRows
         normalBuffer.setupTabStops (index: oldCols, tabStopWidth: tabStopWidth)
         altBuffer.setupTabStops (index: oldCols, tabStopWidth: tabStopWidth)
+        syncUserScrollingWithViewport()
         refresh (startRow: 0, endRow: self.rows - 1)
     }
     
@@ -5523,6 +5528,7 @@ open class Terminal {
         options.scrollback = newScrollback ?? 0
 
         // Refresh the display to ensure proper rendering after scrollback size change.
+        syncUserScrollingWithViewport()
         refresh (startRow: 0, endRow: self.rows - 1)
     }
 
@@ -5584,9 +5590,22 @@ open class Terminal {
         DispatchQueue.main.asyncAfter(deadline: .now() + synchronizedOutputTimeoutSeconds, execute: workItem)
     }
 
-    func setViewYDisp (_ newValue: Int)
+    func setViewYDisp (_ newValue: Int, userInitiated: Bool = false)
     {
-        buffer.yDisp = newValue
+        let maxYDisp = max(0, buffer.lines.count - buffer.rows)
+        buffer.yDisp = max(0, min(newValue, maxYDisp))
+        if userInitiated {
+            syncUserScrollingWithViewport()
+        }
+    }
+
+    private func syncUserScrollingWithViewport ()
+    {
+        guard buffer === normalBuffer, buffer.hasScrollback else {
+            userScrolling = false
+            return
+        }
+        userScrolling = buffer.yDisp < buffer.yBase
     }
 
     /**
