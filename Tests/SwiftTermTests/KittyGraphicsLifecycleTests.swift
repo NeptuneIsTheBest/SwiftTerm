@@ -1,7 +1,6 @@
 //
 //  KittyGraphicsLifecycleTests.swift
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -371,4 +370,3 @@ final class KittyGraphicsLifecycleTests {
         #expect(t.kittyGraphicsState.imagesById[1] != nil)
     }
 }
-#endif

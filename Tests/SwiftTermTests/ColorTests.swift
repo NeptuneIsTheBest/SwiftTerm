@@ -5,7 +5,6 @@
 //  Created by Miguel de Icaza on 4/29/21.
 //
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -237,4 +236,3 @@ final class ColorTests {
         #expect(luminance(terminal.ansiColors[232]) <= luminance(terminal.ansiColors[255]))
     }
 }
-#endif

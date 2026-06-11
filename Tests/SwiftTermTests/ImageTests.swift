@@ -4,7 +4,6 @@
 //
 //  Created by Miguel de Icaza on 4/29/21.
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -251,4 +250,3 @@ final class ImageTrackingTests: TerminalDelegate {
         #expect(terminal.normalBuffer.hasAnyImages == true, "Normal buffer should still have images")
     }
 }
-#endif

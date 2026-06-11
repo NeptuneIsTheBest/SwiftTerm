@@ -1,4 +1,3 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 import Foundation
 #if canImport(os)
 import os
@@ -6,11 +5,7 @@ import os
 import CoreText
 import Metal
 import MetalKit
-#if os(macOS)
 import AppKit
-#else
-import UIKit
-#endif
 
 struct GlyphKey: Hashable {
     let fontName: String
@@ -323,15 +318,11 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
             frameSemaphore.signal()
             return
         }
-#if os(macOS)
         rasterizer.fontSmoothing = terminalView.fontSmoothing
         let scale = terminalView.metalRenderingScaleFactor()
         if let layer = view.layer, layer.contentsScale != scale {
             layer.contentsScale = scale
         }
-#else
-        let scale = terminalView.backingScaleFactor()
-#endif
         view.drawableSize = CGSize(width: view.bounds.width * scale, height: view.bounds.height * scale)
         let cursorStyle = terminalView.terminal.options.cursorStyle
         let shouldBlink = isBlinkStyle(cursorStyle) && !terminalView.terminal.cursorHidden
@@ -788,29 +779,12 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         guard buffer.lines.count > 0 else {
             return nil
         }
-        #if os(iOS) || os(visionOS)
-        let viewHeight = terminalView.bounds.height
-        guard cellHeight > 0, viewHeight > 0 else {
-            return nil
-        }
-        let contentHeight = CGFloat(buffer.lines.count) * cellHeight
-        let maxOffset = max(0, contentHeight - viewHeight)
-        let offsetY = min(max(0, terminalView.contentOffset.y), maxOffset)
-        let firstRow = max(0, Int(floor(offsetY / cellHeight)))
-        let lastRow = min(buffer.lines.count - 1,
-                          Int(floor((offsetY + viewHeight - 1) / cellHeight)))
-        if firstRow > lastRow {
-            return nil
-        }
-        return (firstRow, lastRow, firstRow)
-        #else
         let firstRow = buffer.yDisp
         let lastRow = min(buffer.lines.count - 1, buffer.yDisp + buffer.rows - 1)
         if firstRow > lastRow {
             return nil
         }
         return (firstRow, lastRow, buffer.yDisp)
-        #endif
     }
 
     private func buildRowDrawData(row: Int,
@@ -1835,7 +1809,6 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
     }
 
     private func colorToSIMD(_ color: TTColor) -> SIMD4<Float> {
-        #if os(macOS)
         let rgb = color.usingColorSpace(.deviceRGB) ?? color
         var r: CGFloat = 0
         var g: CGFloat = 0
@@ -1843,30 +1816,6 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         var a: CGFloat = 1
         rgb.getRed(&r, green: &g, blue: &b, alpha: &a)
         return SIMD4<Float>(Float(r), Float(g), Float(b), Float(a))
-        #else
-        var r: CGFloat = 0
-        var g: CGFloat = 0
-        var b: CGFloat = 0
-        var a: CGFloat = 1
-        if color.getRed(&r, green: &g, blue: &b, alpha: &a) {
-            return SIMD4<Float>(Float(r), Float(g), Float(b), Float(a))
-        }
-        let cgColor = color.cgColor
-        let components = cgColor.components ?? [0, 0, 0, 1]
-        if components.count >= 4 {
-            return SIMD4<Float>(Float(components[0]),
-                                Float(components[1]),
-                                Float(components[2]),
-                                Float(components[3]))
-        }
-        if components.count == 2 {
-            return SIMD4<Float>(Float(components[0]),
-                                Float(components[0]),
-                                Float(components[0]),
-                                Float(components[1]))
-        }
-        return SIMD4<Float>(0, 0, 0, 1)
-        #endif
     }
 
     private func makeBuffer<T>(_ vertices: [T]) -> MTLBuffer? {
@@ -2096,11 +2045,7 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         let x1 = x0 + cellWidthPx
         let y1 = y0 + cellHeightPx
 
-        #if os(macOS)
         let hasFocus = terminalView.caretViewTracksFocus ? terminalView.hasFocus : true
-        #else
-        let hasFocus = terminalView.caretViewTracksFocus ? terminalView.isFirstResponder : true
-        #endif
         let cursorColor = colorToSIMD(terminalView.caretColor)
         let cursorClip = ClipRect(minX: Float(x0), minY: Float(y0), maxX: Float(x1), maxY: Float(y1))
         var colorVertices: [ColorVertex] = []
@@ -2239,15 +2184,9 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         if let cgImage = cgImage(from: image.image) {
             texture = try? textureLoader.newTexture(cgImage: cgImage, options: textureOptions())
         }
-        #if os(macOS)
         if texture == nil, let data = image.image.tiffRepresentation {
             texture = try? textureLoader.newTexture(data: data, options: textureOptions())
         }
-        #else
-        if texture == nil, let data = image.image.pngData() {
-            texture = try? textureLoader.newTexture(data: data, options: textureOptions())
-        }
-        #endif
         if let texture {
             imageTextureCache.setObject(texture, forKey: image)
         } else {
@@ -2331,7 +2270,6 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
     }
 
     private func cgImage(from image: TTImage) -> CGImage? {
-        #if os(macOS)
         var rect = CGRect(origin: .zero, size: image.size)
         if let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) {
             return cgImage
@@ -2341,9 +2279,6 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
             return nil
         }
         return bitmap.cgImage
-        #else
-        return image.cgImage
-        #endif
     }
 
     private func textureOptions() -> [MTKTextureLoader.Option: Any] {
@@ -2760,4 +2695,3 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         return bundles
     }
 }
-#endif

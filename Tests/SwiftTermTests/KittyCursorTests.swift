@@ -1,7 +1,6 @@
 //
 //  KittyCursorTests.swift
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -55,4 +54,3 @@ final class KittyCursorTests {
         #expect(t.buffer.y == 1)
     }
 }
-#endif

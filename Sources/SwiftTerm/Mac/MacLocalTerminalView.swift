@@ -5,7 +5,6 @@
 //  Created by Miguel de Icaza on 3/6/20.
 //
 
-#if os(macOS)
 import Foundation
 import AppKit
 
@@ -203,4 +202,3 @@ open class LocalProcessTerminalView: TerminalView, TerminalViewDelegate, LocalPr
     }
 }
 
-#endif

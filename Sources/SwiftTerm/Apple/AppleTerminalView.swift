@@ -1,11 +1,10 @@
 //
 //  AppleTerminalView.swift
 //
-// Shared code for UIKit and Appkit for the terminal view
+// Shared AppKit code for the terminal view
 //
 //  Created by Miguel de Icaza on 4/21/20.
 //
-#if os(macOS) || os(iOS) || os(visionOS)
 import Foundation
 import CoreGraphics
 import CoreText
@@ -15,27 +14,15 @@ import MetalKit
 #if canImport(ImageIO)
 import ImageIO
 #endif
-import SwiftUI
 
 let SwiftTermUnderlineStyleKey = NSAttributedString.Key("SwiftTermUnderlineStyle")
 
-#if os(iOS) || os(visionOS)
-import UIKit
-typealias TTColor = UIColor
-typealias TTFont = UIFont
-typealias TTRect = CGRect
-typealias TTBezierPath = UIBezierPath
-public typealias TTImage = UIImage
-#endif
-
-#if os(macOS)
 import AppKit
 typealias TTColor = NSColor
 typealias TTFont = NSFont
 typealias TTRect = CGRect
 typealias TTBezierPath = NSBezierPath
 public typealias TTImage = NSImage
-#endif
 
 /// Controls how links are discovered during pointer/hover tracking in terminal views.
 public enum LinkReporting {
@@ -86,7 +73,6 @@ struct ViewLineInfo {
 extension TerminalView {
     typealias CellDimension = CGSize
 
-#if os(macOS)
     /// Controls whether font smoothing (sub-pixel rendering) is enabled during glyph drawing.
     /// Set to `false` to get thinner strokes on Retina displays, matching iTerm2's "Thin strokes" setting.
     /// Defaults to `true` (standard macOS font smoothing).
@@ -94,7 +80,6 @@ extension TerminalView {
         get { _fontSmoothing }
         set { _fontSmoothing = newValue }
     }
-#endif
 
     /// Multiplier for vertical line spacing. 1.0 = default (ascent + descent + leading).
     /// Set to 1.1 for 110% vertical spacing (matches iTerm2's vertical spacing setting).
@@ -127,11 +112,7 @@ extension TerminalView {
         }
         updateCaretView()
         
-        #if os(macOS)
         needsDisplay = true
-        #else
-        setNeedsDisplay(frame)
-        #endif
     }
     
     func updateCaretView ()
@@ -181,11 +162,7 @@ extension TerminalView {
         
         search = SearchService (terminal: terminal)
         
-        #if os(macOS)
         needsDisplay = true
-        #else
-        setNeedsDisplay(frame)
-        #endif
     }
 
     /// Returns the underlying terminal emulator that the `TerminalView` is a view for
@@ -227,7 +204,6 @@ extension TerminalView {
         let lineDescent = CTFontGetDescent (fontSet.normal)
         let lineLeading = CTFontGetLeading (fontSet.normal)
         let cellHeight = ceil((lineAscent + lineDescent + lineLeading) * _lineSpacing)
-        #if os(macOS)
         // The following is a more robust way of getting the largest ascii character width, but comes with a performance hit.
         // See: https://github.com/migueldeicaza/SwiftTerm/issues/286
         // var sizes = UnsafeMutablePointer<NSSize>.allocate(capacity: 95)
@@ -241,10 +217,6 @@ extension TerminalView {
         // }
         let glyph = fontSet.normal.glyph(withName: "W")
         let cellWidth = fontSet.normal.advancement(forGlyph: glyph).width
-        #else
-        let fontAttributes = [NSAttributedString.Key.font: fontSet.normal]
-        let cellWidth = "W".size(withAttributes: fontAttributes).width
-        #endif
         // Snap to pixel grid to avoid sub-pixel seams between adjacent cells
         let scale = backingScaleFactor()
         let snappedWidth = ceil(cellWidth * scale) / scale
@@ -1179,24 +1151,11 @@ extension TerminalView {
         func calcLineOffset (forRow: Int) -> CGFloat {
             cellDimension.height * CGFloat (forRow-bufferOffset+1)
         }
-        // draw lines
-        #if os(iOS) || os(visionOS)
-        // On iOS, use contentOffset.y to determine the first visible row rather than
-        // dirtyRect.minY. UIKit coalesces dirty rects across scroll and data updates and
-        // can deliver a rect with minY=0 even when the scroll position (contentOffset.y)
-        // is non-zero. This causes SwiftTerm to draw scrollback-buffer rows at viewport
-        // positions, producing garbled output. contentOffset.y is always correct because
-        // the scroll view is kept in sync with yDisp (contentOffset.y == yDisp * cellHeight).
-        let cellHeight = cellDimension.height
-        let firstRow = Int(contentOffset.y / cellHeight)
-        let lastRow = firstRow + Int(ceil(bounds.height / cellHeight))
-        #else
         // On Mac, we are drawing the terminal buffer
         let cellHeight = cellDimension.height
         let boundsMaxY = bounds.maxY
         let firstRow = displayBuffer.yDisp+Int ((boundsMaxY-dirtyRect.maxY)/cellHeight)
         let lastRow = displayBuffer.yDisp+Int((boundsMaxY-dirtyRect.minY)/cellHeight)
-        #endif
 
         let isAltBuffer = terminal.isCurrentBufferAlternate
         var virtualPlacementsByImageId: [UInt32: [KittyPlacementRecord]] = [:]
@@ -1358,24 +1317,14 @@ extension TerminalView {
                                     let marginX = rect.origin.x + rect.size.width
                                     if marginX < frame.width {
                                         let marginRect = CGRect(x: marginX, y: rect.origin.y, width: frame.width - marginX, height: rect.size.height)
-                                        #if os(macOS)
                                         nativeBackgroundColor.setFill()
                                         marginRect.fill()
-                                        #else
-                                        context.setFillColor(nativeBackgroundColor.cgColor)
-                                        context.fill(marginRect)
-                                        #endif
                                     }
                                 }
                             }
 
-                            #if os(macOS)
                             backgroundColor.setFill()
                             rect.fill()
-                            #else
-                            context.setFillColor(backgroundColor.cgColor)
-                            context.fill(rect)
-                            #endif
                         }
                     }
                     processedGlyphs += runGlyphsCount
@@ -1408,10 +1357,8 @@ extension TerminalView {
 
             context.setShouldAntialias(true)
             context.setAllowsAntialiasing(true)
-            #if os(macOS)
             context.setShouldSmoothFonts(fontSmoothing)
             context.setAllowsFontSmoothing(fontSmoothing)
-            #endif
 
             // Glyph drawing loop — reuses cached CTLines
             for prepared in preparedSegments {
@@ -1538,74 +1485,12 @@ extension TerminalView {
             }
         }
         
-#if os(macOS)
         // Fills gaps at the end with the default terminal background
         let box = CGRect (x: 0, y: 0, width: bounds.width, height: bounds.height.truncatingRemainder(dividingBy: cellHeight))
         if dirtyRect.intersects(box) {
             nativeBackgroundColor.setFill()
             context.fill ([box])
         }
-#elseif false
-        // Currently the caller on iOS is clearing the entire dirty region due to the ordering of
-        // font change sizes, but once we fix that, we should remove the clearing of the dirty
-        // region in the calling code, and enable this code instead.
-        let lineOffset = calcLineOffset(forRow: lastRow)
-        let lineOrigin = CGPoint(x: 0, y: frame.height - lineOffset)
-
-        let inter = dirtyRect.intersection(CGRect (x: 0, y: lineOrigin.y, width: bounds.width, height: cellHeight))
-        if !inter.isEmpty {
-            nativeBackgroundColor.setFill()
-            context.fill ([inter])
-        }
-#endif
-        
-#if os(iOS) || os(visionOS)
-        if selection.active {
-            let start, end: Position
-
-            func drawSelectionHandle (drawStart: Bool, row: Int) {
-                let lineOffset = calcLineOffset(forRow: row)
-                let lineOrigin = frame.height - lineOffset
-                
-                context.saveGState ()
-                let start = CGPoint (
-                    x: CGFloat (drawStart ? start.col : end.col) * cellDimension.width,
-                    y: lineOrigin)
-                let end = CGPoint(x: start.x, y: start.y + cellDimension.height)
-                
-                context.move(to: end)
-                context.addLine(to: start)
-                let size = 12.0
-                let location = drawStart ? end : start
-                
-                let rect = CGRect (origin:
-                                    CGPoint (x: location.x-(size/2.0),
-                                             y: location.y - (drawStart ? 0.0 : size)),
-                                   size: CGSize (width: size, height: size))
-                context.addEllipse(in: rect)
-                context.closePath()
-                context.setLineWidth(2)
-                selectionHandleColor.set ()
-                //TTColor.systemBlue.set ()
-                context.drawPath(using: .fillStroke)
-                context.restoreGState()
-            }
-            
-            // Normalize the selection start/end, regardless of where it started
-            let sstart = selection.start
-            let send = selection.end
-            if Position.compare (sstart, send) == .before {
-                start = sstart
-                end = send
-            } else {
-                start = send
-                end = sstart
-            }
-            
-            drawSelectionHandle (drawStart: true, row: start.row)
-            drawSelectionHandle (drawStart: false, row: end.row)
-        }
-#endif
     }
     
     /// Update visible area
@@ -1649,7 +1534,6 @@ extension TerminalView {
         SyncDebug.log("paint rows=\(rowStart)-\(rowEnd)")
         terminal.clearUpdateRange ()
 
-        #if os(macOS)
         let baseLine = frame.height
         var region = CGRect (x: 0,
                              y: baseLine - (cellDimension.height + CGFloat(rowEnd) * cellDimension.height),
@@ -1698,34 +1582,13 @@ extension TerminalView {
 #else
         setNeedsDisplay(region)
 #endif
-        #else
-        // TODO iOS: need to update the code above, but will do that when I get some real
-        // life data being fed into it.
-        #if canImport(MetalKit)
-        if metalView != nil {
-            metalDirtyRange = metalVisibleRange()
-            let buffer = terminal.displayBuffer
-            lastRenderedCursor = (x: buffer.x, y: buffer.yBase + buffer.y, hidden: terminal.cursorHidden)
-            requestMetalDisplay()
-        } else {
-            setNeedsDisplay(bounds)
-        }
-        #else
-        setNeedsDisplay(bounds)
-        #endif
-        #endif
 
         updateDebugDisplay ()
         
         if (notifyAccessibility) {
             accessibility.invalidate ()
-            #if os(iOS)
-            UIAccessibility.post(notification: .layoutChanged, argument: nil)
-            #endif
-            #if os(macOS)
             NSAccessibility.post (element: self, notification: .valueChanged)
             NSAccessibility.post (element: self, notification: .selectedTextChanged)
-            #endif
         }
     }
     
@@ -1746,13 +1609,8 @@ extension TerminalView {
             caretView.removeFromSuperview()
         }
         let doublePosition = buffer.lines [vy].renderMode == .single ? 1.0 : 2.0
-        #if os(iOS) || os(visionOS)
-        let offset = (cellDimension.height * (CGFloat(buffer.y+(buffer.yBase))))
-        let lineOrigin = CGPoint(x: 0, y: offset)
-        #else
         let offset = (cellDimension.height * (CGFloat(buffer.y-(buffer.yDisp-buffer.yBase)+1)))
         let lineOrigin = CGPoint(x: 0, y: frame.height - offset)
-        #endif
         caretView.frame.origin = CGPoint(x: lineOrigin.x + (cellDimension.width * doublePosition * CGFloat(buffer.x)), y: lineOrigin.y)
         caretView.setText (ch: buffer.lines [vy][buffer.x])
     }
@@ -2038,13 +1896,6 @@ extension TerminalView {
     public func send(data: ArraySlice<UInt8>)
     {
         ensureCaretIsVisible ()
-        #if os(iOS) || os(visionOS)
-        if TerminalView.textInputDebugEnabled {
-            let previewBytes = data.prefix(32).map { String(format: "%02X", $0) }.joined(separator: " ")
-            print("UITextInput[\(TerminalView.textInputLogCounter + 1)]: send bytes=\(data.count) [\(previewBytes)]")
-            TerminalView.textInputLogCounter += 1
-        }
-        #endif
         terminalDelegate?.send (source: self, data: data)
     }
     
@@ -2053,12 +1904,6 @@ extension TerminalView {
      * - Parameter txt: the string to send to the client
      */
     public func send (txt: String) {
-        #if os(iOS) || os(visionOS)
-        if TerminalView.textInputDebugEnabled {
-            print("UITextInput[\(TerminalView.textInputLogCounter + 1)]: send txt=\(txt.debugDescription)")
-            TerminalView.textInputLogCounter += 1
-        }
-        #endif
         let array = [UInt8] (txt.utf8)
         send (data: array[...])
     }
@@ -2179,23 +2024,12 @@ extension TerminalView {
         }
 
         func pixelSizeForImage (_ image: TTImage) -> CGSize? {
-            #if os(macOS)
             for rep in image.representations {
                 if rep.pixelsWide > 0 && rep.pixelsHigh > 0 {
                     return CGSize(width: rep.pixelsWide, height: rep.pixelsHigh)
                 }
             }
             return nil
-            #else
-            if let cgImage = image.cgImage {
-                return CGSize(width: cgImage.width, height: cgImage.height)
-            }
-            let scale = image.scale
-            if scale > 0 {
-                return CGSize(width: image.size.width * scale, height: image.size.height * scale)
-            }
-            return nil
-            #endif
         }
 
         let pixelSize = placementContext == nil ? nil : pixelSizeForImage(img)
@@ -2255,23 +2089,14 @@ extension TerminalView {
         
         let stripeSize = CGSize (width: width, height: cellDimension.height)
         var didScroll = false
-        #if os(iOS) || os(visionOS)
-        var srcY: CGFloat = 0
-        #else
         var srcY: CGFloat = img.size.height
-        #endif
         
         let heightRatio = img.size.height/height
         for _ in 0..<rows {
-            #if os(macOS)
             srcY -= cellDimension.height * heightRatio
-            #endif
             guard let stripe = drawImageInStripe (image: img, srcY: srcY, width: width, srcHeight: cellDimension.height * heightRatio, dstHeight: cellDimension.height, size: stripeSize) else {
                 continue
             }
-            #if os(iOS) || os(visionOS)
-            srcY += cellDimension.height * heightRatio
-            #endif
             
             let attachedImage = AppleImage (image: stripe, width: Int (stripeSize.width), height: Int (cellDimension.height), onCol: terminal.buffer.x)
             if let context = placementContext {
@@ -2347,16 +2172,3 @@ extension TerminalView {
     }
 
 }
-
-#if canImport(UIKit) && DEBUG
-#Preview {
-    SwiftUITerminalView { t in
-        t.nativeBackgroundColor = UIColor.black
-        t.selectedTextBackgroundColor = UIColor.red
-        t.caretColor = UIColor.blue
-        t.feed(text: "م اَلْفِرَاق\n\rbbفِaa\n\r123456\n\r🖐🏾 or 👩‍👩‍👦‍👦")
-    }
-}
-#endif
-
-#endif

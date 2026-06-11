@@ -1,4 +1,3 @@
-#if os(macOS)
 import Darwin
 import Foundation
 import Testing
@@ -349,4 +348,3 @@ final class SwiftTermTests {
         #expect(runTester("test_HPA") == nil)
     }
 }
-#endif

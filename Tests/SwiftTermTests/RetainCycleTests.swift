@@ -1,4 +1,3 @@
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -38,4 +37,3 @@ final class RetainCycleTests {
         #expect(weakTerminal == nil, "Terminal leaked — retain cycle after resetToInitialState()")
     }
 }
-#endif

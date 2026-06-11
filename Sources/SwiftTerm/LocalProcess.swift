@@ -6,7 +6,6 @@
 //
 //  Created by Miguel de Icaza on 4/5/20.
 //
-#if !os(iOS) && !os(Windows)
 import Foundation
 import Dispatch
 #if false //canImport(Subprocess)
@@ -268,12 +267,10 @@ public class LocalProcess {
 
     func childStopped(cancelProcessMonitor: Bool = true) {
         running = false
-#if os(macOS)
         if cancelProcessMonitor {
             childMonitor?.cancel()
             childMonitor = nil
         }
-#endif
     }
 
     /* Total number of bytes read */
@@ -342,15 +339,11 @@ public class LocalProcess {
         }
     }
 
-#if os(macOS)
     var childMonitor: DispatchSourceProcess?
-#endif
 
     deinit {
-#if os(macOS)
         childMonitor?.cancel()
         childMonitor = nil
-#endif
         // With [weak self] in the read/write handlers, deinit can fire even
         // when the consumer never called terminate() explicitly. Close the
         // DispatchIO so its cleanup handler releases the file descriptor —
@@ -511,7 +504,6 @@ public class LocalProcess {
         }
 
         if let (shellPid, childfd) = PseudoTerminalHelpers.fork(andExec: executable, args: shellArgs, env: env, currentDirectory: currentDirectory, desiredWindowSize: &size) {
-#if os(macOS)
             childMonitor = DispatchSource.makeProcessSource(identifier: shellPid, eventMask: .exit, queue: dispatchQueue)
             if let cm = childMonitor {
                 if #available(macOS 10.12, *) {
@@ -521,7 +513,6 @@ public class LocalProcess {
                 }
                 cm.setEventHandler(handler: { [weak self] in self?.processTerminated () })
             }
-#endif
             running = true
             self.childfd = childfd
             self.shellPid = shellPid
@@ -582,4 +573,3 @@ public class LocalProcess {
         loggingDir = directory
     }
 }
-#endif

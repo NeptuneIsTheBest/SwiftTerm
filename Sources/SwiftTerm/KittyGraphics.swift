@@ -5,27 +5,13 @@
 //
 
 import Foundation
-#if os(Linux)
-import Glibc
-#elseif os(Windows)
-import WinSDK
-#else
 import Darwin
-#endif
-#if canImport(Compression)
 import Compression
-#endif
-#if canImport(CoreGraphics)
 import CoreGraphics
-#endif
-#if canImport(ImageIO)
 import ImageIO
-#endif
 
-#if !os(Windows)
 @_silgen_name("shm_open")
 private func swiftShmOpen(_ name: UnsafePointer<CChar>, _ oflag: Int32, _ mode: mode_t) -> Int32
-#endif
 
 struct KittyPlacementContext {
     var imageId: UInt32?
@@ -494,7 +480,6 @@ extension Terminal {
     }
 
     private func decodePngToRgba(_ data: Data) -> (bytes: [UInt8], width: Int, height: Int)? {
-        #if canImport(ImageIO) && canImport(CoreGraphics)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             return nil
@@ -518,13 +503,9 @@ extension Terminal {
         }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return (output, width, height)
-        #else
-        return nil
-        #endif
     }
 
     private func kittyPngPixelSize(data: Data) -> (width: Int, height: Int)? {
-        #if canImport(ImageIO)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = props[kCGImagePropertyPixelWidth] as? Int,
@@ -532,9 +513,6 @@ extension Terminal {
             return nil
         }
         return (width, height)
-        #else
-        return nil
-        #endif
     }
 
     private func kittyPlacementGridSize(payload: KittyGraphicsPayload,
@@ -722,7 +700,6 @@ extension Terminal {
     }
 
     private func validateKittyPngDimensions(data: Data) -> Bool {
-        #if canImport(ImageIO)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = props[kCGImagePropertyPixelWidth] as? Int,
@@ -730,15 +707,9 @@ extension Terminal {
             return false
         }
         return validateKittyDimensions(width: width, height: height)
-        #else
-        return true
-        #endif
     }
 
     private func loadKittyFilePayload(control: KittyGraphicsControl, base64Payload: [UInt8], temporary: Bool) -> (payload: KittyGraphicsPayload?, errorMessage: String?) {
-        #if os(Windows)
-        return (nil, "ENOTSUP: unsupported transmission")
-        #else
         guard let pathData = decodeKittyBase64Payload(base64Payload), !pathData.isEmpty else {
             return (nil, "EINVAL: bad payload")
         }
@@ -776,13 +747,9 @@ extension Terminal {
             return (nil, "EINVAL: bad payload")
         }
         return (payload, nil)
-        #endif
     }
 
     private func loadKittySharedMemoryPayload(control: KittyGraphicsControl, base64Payload: [UInt8]) -> (payload: KittyGraphicsPayload?, errorMessage: String?) {
-        #if os(Windows)
-        return (nil, "ENOTSUP: unsupported transmission")
-        #else
         guard let pathData = decodeKittyBase64Payload(base64Payload), !pathData.isEmpty else {
             return (nil, "EINVAL: bad payload")
         }
@@ -812,7 +779,6 @@ extension Terminal {
             return (nil, "EINVAL: bad payload")
         }
         return (payload, nil)
-        #endif
     }
 
     private func kittyExpectedDataSize(control: KittyGraphicsControl) -> Int? {
@@ -834,11 +800,6 @@ extension Terminal {
         }
     }
 
-    #if os(Windows)
-    private func resolveKittyRealPath(_ path: String) -> String? {
-        nil
-    }
-    #else
     private func resolveKittyRealPath(_ path: String) -> String? {
         return path.withCString { cstr -> String? in
             var buffer = [CChar](repeating: 0, count: Int(PATH_MAX))
@@ -848,7 +809,6 @@ extension Terminal {
             return String(cString: buffer)
         }
     }
-    #endif
 
     private func isKittySafePath(_ path: String) -> Bool {
         if path.hasPrefix("/proc/") || path.hasPrefix("/sys/") {
@@ -874,7 +834,6 @@ extension Terminal {
         return false
     }
 
-    #if !os(Windows)
     private func readKittyFileData(path: String, offset: Int, size: Int, deleteAfterRead: Bool) -> Data? {
         guard offset >= 0, size >= 0 else {
             return nil
@@ -946,9 +905,7 @@ extension Terminal {
         }
         return data
     }
-    #endif
 
-    #if !os(Windows)
     private func readKittySharedMemory(name: String, expectedSize: Int?, offset: Int, size: Int) -> Data? {
         guard offset >= 0, size >= 0 else {
             return nil
@@ -1002,7 +959,6 @@ extension Terminal {
         let startPtr = map.advanced(by: start)
         return Data(bytes: startPtr, count: end - start)
     }
-    #endif
 
     private func displayKittyImage(payload: KittyGraphicsPayload, control: KittyGraphicsControl, imageId: UInt32?, imageNumber: UInt32?) -> Bool {
         if control.unicodePlaceholder == 1 {
@@ -1874,7 +1830,6 @@ extension Terminal {
     }
 
     private func decompressZlib(_ data: Data) -> Data? {
-#if canImport(Compression)
         let dummyDst = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
         let dummySrc = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
         var stream = compression_stream(dst_ptr: dummyDst,
@@ -1929,8 +1884,5 @@ extension Terminal {
                 }
             }
         }
-#else
-        return nil
-#endif
     }
 }

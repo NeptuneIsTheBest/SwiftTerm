@@ -11,7 +11,6 @@
 //
 //  Created by Miguel de Icaza on 4/24/20.
 //
-#if os(macOS)
 import Foundation
 import SwiftTerm
 
@@ -30,4 +29,3 @@ var queue = DispatchQueue(label: "Runner", qos: .userInteractive, attributes: .c
     t.feed (byteArray: arr)
     return 0
 }
-#endif

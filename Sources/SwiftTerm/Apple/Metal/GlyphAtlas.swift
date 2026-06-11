@@ -1,4 +1,3 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 import CoreGraphics
 import Metal
 
@@ -269,4 +268,3 @@ final class GlyphAtlas {
         return device.makeTexture(descriptor: descriptor)
     }
 }
-#endif

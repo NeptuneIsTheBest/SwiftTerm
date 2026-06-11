@@ -3589,7 +3589,7 @@ open class Terminal {
                 // Request locator status
                 sendResponse(cc.CSI, "?53n")
             case 56:
-                // What kind of locator we have, we reply mouse, but perhaps on iOS we should respond something else
+                // What kind of locator we have; reply with mouse locator support.
                 sendResponse(cc.CSI, "?57;1n")
             case 62:
                 // Macro space report

@@ -1,4 +1,3 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 import Foundation
 
 /// Errors thrown when initializing or configuring the Metal rendering pipeline.
@@ -46,4 +45,3 @@ public enum MetalError: Error, CustomStringConvertible {
         }
     }
 }
-#endif

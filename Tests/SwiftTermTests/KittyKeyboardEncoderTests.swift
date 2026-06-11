@@ -1,7 +1,6 @@
 //
 //  KittyKeyboardEncoderTests.swift
 //
-#if os(macOS)
 import XCTest
 @testable import SwiftTerm
 
@@ -463,4 +462,3 @@ final class KittyKeyboardEncoderTests: XCTestCase {
                      expected: "\u{1b}[1;65A")
     }
 }
-#endif

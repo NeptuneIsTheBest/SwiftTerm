@@ -1,7 +1,6 @@
 //
 //  KittyTransmissionTests.swift
 //
-#if os(macOS)
 import Testing
 import Foundation
 import Darwin
@@ -259,4 +258,3 @@ final class KittyTransmissionTests {
         #expect(t.kittyGraphicsState.imagesById[1] == nil)
     }
 }
-#endif

@@ -4,7 +4,6 @@
 //
 //  Created by Miguel de Icaza on 4/15/20.
 //
-#if os(macOS) || os(iOS) || os(visionOS)
 import Foundation
 
 extension NSAttributedString.Key {
@@ -27,5 +26,3 @@ extension NSRange {
         NSRange(location: NSNotFound, length: 0)
     }
 }
-
-#endif

@@ -1,15 +1,15 @@
 # ``SwiftTerm``
 
 SwiftTerm is a VT100/Xterm terminal emulator library for Swift applications that
-can be embedded into macOS, iOS applications, text-based, headless applications
-or other custom scenarios.
+can be embedded into macOS AppKit applications, text-based headless tools, or
+other macOS terminal scenarios.
 
 ## Overview
 
-SwiftTerm provides a reusable, pluggable terminal emulation engine with platform-specific
-front-ends for AppKit (macOS) and UIKit (iOS/visionOS). The core engine handles escape
-sequence parsing, buffer management, Unicode rendering, and terminal state — while the
-view layer handles input, rendering, and platform integration.
+SwiftTerm provides a reusable, pluggable terminal emulation engine with an
+AppKit front-end for macOS. The core engine handles escape sequence parsing,
+buffer management, Unicode rendering, and terminal state, while the view layer
+handles input, rendering, and macOS integration.
 
 The library has been used in several commercially available SSH clients, including
 [Secure Shellfish](https://apps.apple.com/us/app/secure-shellfish-ssh-files/id1336634154),
@@ -26,12 +26,6 @@ any data source by implementing ``TerminalViewDelegate``. For the common case of
 running a local Unix process, ``LocalProcessTerminalView`` connects the terminal
 to a pseudo-terminal.
 
-### iOS and visionOS
-
-The UIKit ``TerminalView`` is an embeddable `UIScrollView` subclass that uses the
-same ``TerminalViewDelegate`` protocol. Since iOS does not support local processes,
-the typical use case is connecting the terminal to a remote host via SSH.
-
 ### Headless
 
 ``HeadlessTerminal`` runs a local process without any UI, useful for scripting,
@@ -46,7 +40,7 @@ testing, and screen-scraping terminal output.
 - Terminal resizing (local and remote-initiated)
 - Hyperlink support (OSC 8)
 - Configurable Apple view link tracking via ``LinkReporting`` (explicit OSC 8 and implicit URL detection)
-- Optional GPU-accelerated rendering via Metal (macOS, iOS, visionOS)
+- Optional GPU-accelerated rendering via Metal on macOS
 - Graphics: Sixel, iTerm2-style inline images, and Kitty graphics protocol
 - Selection and search with a built-in macOS find bar and programmable search APIs
 - Thread-safe ``Terminal`` instances

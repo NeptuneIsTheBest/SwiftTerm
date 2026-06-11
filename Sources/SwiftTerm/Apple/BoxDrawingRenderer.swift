@@ -1,11 +1,6 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 import CoreGraphics
 import Foundation
-#if os(iOS) || os(visionOS)
-import UIKit
-#elseif os(macOS)
 import AppKit
-#endif
 
 enum LineStyle {
     case none
@@ -632,4 +627,3 @@ struct BoxDrawingRenderItem {
     let codePoint: UInt32
     let foregroundColor: TTColor
 }
-#endif

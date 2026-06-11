@@ -1,7 +1,6 @@
 //
 //  KittyUnicodeTests.swift
 //
-#if os(macOS)
 import Testing
 import CoreGraphics
 @testable import SwiftTerm
@@ -350,4 +349,3 @@ final class KittyUnicodeTests {
         #expect(placement?.destHeight == 22)
     }
 }
-#endif

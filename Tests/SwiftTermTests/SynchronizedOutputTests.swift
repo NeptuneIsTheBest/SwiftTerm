@@ -109,7 +109,6 @@ final class SynchronizedOutputTests {
 
     // MARK: - View-level regression tests
 
-#if os(macOS)
     /// Regression: scrollTo must not be blocked during synchronized output.
     @Test func testViewScrollToDuringSyncIsNotBlocked() {
         let view = TerminalView(frame: CGRect(origin: .zero, size: .init(width: 400, height: 100)))
@@ -152,5 +151,4 @@ final class SynchronizedOutputTests {
         #expect(!view.terminal.synchronizedOutputActive)
         #expect(view.scrollPosition >= 0)
     }
-#endif
 }

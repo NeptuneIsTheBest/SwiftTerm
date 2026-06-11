@@ -1,4 +1,3 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 import CoreGraphics
 import CoreText
 
@@ -48,13 +47,8 @@ final class CoreTextGlyphRasterizer {
             context.setShouldSubpixelPositionFonts(true)
             context.setAllowsFontSubpixelQuantization(false)
             context.setShouldSubpixelQuantizeFonts(false)
-#if os(macOS)
             context.setAllowsFontSmoothing(fontSmoothing)
             context.setShouldSmoothFonts(fontSmoothing)
-#else
-            context.setAllowsFontSmoothing(false)
-            context.setShouldSmoothFonts(false)
-#endif
 
             context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
             context.setStrokeColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
@@ -87,4 +81,3 @@ final class CoreTextGlyphRasterizer {
                            isColor: isColor)
     }
 }
-#endif

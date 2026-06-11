@@ -1,4 +1,3 @@
-#if os(macOS)
 import Benchmark
 import Dispatch
 import Foundation
@@ -36,6 +35,3 @@ let benchmarks: @Sendable () -> Void = {
         testFeed(benchmark: benchmark, data: data, innerIterations: 1_000)
     }
 }
-#else
-let benchmarks: @Sendable () -> Void = { }
-#endif

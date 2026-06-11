@@ -4,7 +4,6 @@
 //  Tests for DCS (Device Control String) sequence handling
 //  Ported from Ghostty's dcs.zig tests
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -218,4 +217,3 @@ final class DcsTests {
         // Terminal should respond with cursor style
     }
 }
-#endif

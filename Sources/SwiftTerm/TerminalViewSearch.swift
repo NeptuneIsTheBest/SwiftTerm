@@ -5,7 +5,6 @@
 //  Search integration for TerminalView.
 //
 
-#if os(macOS) || os(iOS) || os(visionOS)
 import Foundation
 
 extension TerminalView {
@@ -124,4 +123,3 @@ extension TerminalView {
         scrollTo(row: target)
     }
 }
-#endif

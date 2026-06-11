@@ -6,7 +6,6 @@
 //
 
 import Foundation
-#if !os(iOS) && !os(tvOS) && !os(Windows)
 
 /**
  * APIs to assist in controlling a Unix pseudo-terminal from Swift.
@@ -116,11 +115,7 @@ public class PseudoTerminalHelpers {
      */
     public static func setWinSize (masterPtyDescriptor: Int32, windowSize: inout winsize) -> Int32
     {
-#if os(macOS)
         return ioctl(masterPtyDescriptor, TIOCSWINSZ, &windowSize)
-#else
-	return ioctl(masterPtyDescriptor, UInt(TIOCSWINSZ), &windowSize)
-#endif
     }
     
     /**
@@ -133,4 +128,3 @@ public class PseudoTerminalHelpers {
         return (status, size)
     }
 }
-#endif

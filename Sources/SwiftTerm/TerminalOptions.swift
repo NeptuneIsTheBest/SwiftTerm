@@ -44,7 +44,7 @@ public enum RegionalIndicatorWidth: Sendable {
     /// Width 2: matches kitty, Ghostty, iTerm2, and the Python wcwidth >= 0.5.2 library.
     /// This is the default and preserves SwiftTerm's existing behavior.
     case wide
-    /// Width 1: matches system wcwidth() on macOS/Linux, Alacritty, WezTerm, Windows Terminal,
+    /// Width 1: matches system wcwidth() on macOS, Alacritty, WezTerm,
     /// and the Unicode East Asian Width property (Neutral). Use this when running inside tmux
     /// or other multiplexers that use wcwidth() for cursor positioning.
     case narrow

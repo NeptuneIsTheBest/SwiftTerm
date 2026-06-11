@@ -8,7 +8,7 @@ The core terminal emulation engine.
 manages the terminal buffer, processes escape sequences, tracks cursor state, and
 notifies its ``TerminalDelegate`` of events.
 
-`Terminal` is UI-agnostic — it can be used with the bundled AppKit and UIKit views,
+`Terminal` is UI-agnostic — it can be used with the bundled AppKit view,
 with a headless backend, or with a custom renderer. All input flows through the
 ``feed(buffer:)`` family of methods, and output is delivered through the delegate's
 ``TerminalDelegate/send(source:data:)`` callback.

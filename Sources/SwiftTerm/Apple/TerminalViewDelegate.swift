@@ -4,7 +4,6 @@
 //
 //  Created by Miguel de Icaza on 4/15/20.
 //
-#if os(iOS) || os(visionOS) || os(macOS)
 import Foundation
 
 /// Delegate used by ``TerminalView`` to notify the user of events happening
@@ -43,13 +42,12 @@ public protocol TerminalViewDelegate: AnyObject {
     func scrolled (source: TerminalView, position: Double)
     
     /**
-     * Invoked when the user activates a link (click on macOS, tap on iOS/visionOS).
+     * Invoked when the user activates a link.
      *
      * Explicit OSC 8 links can provide key/value metadata in `params`. Implicit URL
      * detection uses an empty `params` dictionary.
      *
-     * On macOS, a default implementation opens the URL via `NSWorkspace.shared.open`.
-     * On iOS/visionOS, implement this method to decide how to handle navigation.
+     * The default implementation opens the URL via `NSWorkspace.shared.open`.
      * - Parameter source: the terminalview that called this method
      * - Parameter link: the string that was encoded as a link by the client application, typically a url,
      * but could be anything, and could be used to communicate by the embedded application and the host
@@ -104,4 +102,3 @@ public protocol TerminalViewDelegate: AnyObject {
     func rangeChanged (source: TerminalView, startY: Int, endY: Int)
 
 }
-#endif

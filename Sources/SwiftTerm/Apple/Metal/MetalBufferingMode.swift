@@ -1,4 +1,3 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 /// Controls how the Metal renderer builds and caches GPU buffers each frame.
 ///
 /// The buffering mode affects the trade-off between memory usage and redraw
@@ -16,4 +15,3 @@ public enum MetalBufferingMode {
     /// TUI applications).
     case perFrameAggregated
 }
-#endif

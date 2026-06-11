@@ -4,9 +4,9 @@ Wire a terminal view to a remote host over SSH.
 
 ## Overview
 
-SwiftTerm does not bundle an SSH library to avoid adding a heavyweight dependency.
-Instead, you connect the terminal to an SSH channel by implementing the data flow
-yourself. This guide describes the pattern and points to working examples.
+SwiftTerm does not bundle an SSH library to avoid adding a heavyweight
+dependency. Instead, you connect the terminal to an SSH channel by implementing
+the data flow yourself.
 
 ## The Wiring Pattern
 
@@ -26,18 +26,9 @@ The integration between SwiftTerm and SSH has two directions:
 └──────────────┘  feed(byteArray:) └──────────────┘
 ```
 
-## Example with swift-nio-ssh
+## Example
 
-Apple's [swift-nio-ssh](https://github.com/apple/swift-nio-ssh) is a
-SwiftNIO-based SSH implementation. The iOS sample application in the SwiftTerm
-repository demonstrates a complete integration:
-
-- [`UIKitSshTerminalView.swift`](https://github.com/migueldeicaza/SwiftTerm/blob/main/TerminalApp/iOSTerminal/UIKitSshTerminalView.swift)
-  — subclasses the terminal view and manages the SSH lifecycle.
-- [`SSHLoginView.swift`](https://github.com/migueldeicaza/SwiftTerm/blob/main/TerminalApp/iOSTerminal/SSHLoginView.swift)
-  — provides a login UI for entering credentials.
-
-The core flow in the sample:
+The core flow is:
 
 ```swift
 // 1. In TerminalViewDelegate.send(), forward to SSH:
@@ -73,13 +64,6 @@ environment suitable for the remote shell:
 let env = Terminal.getEnvironmentVariables(termName: "xterm-256color", trueColor: true)
 // Pass env when opening the SSH channel
 ```
-
-## macOS vs iOS
-
-On macOS, you can also use SSH — the only difference is that macOS also supports
-local processes, so SSH is one option among several. On iOS, SSH (or another
-network protocol) is the only way to connect to a shell, since iOS does not allow
-spawning local processes.
 
 ## Other SSH Libraries
 

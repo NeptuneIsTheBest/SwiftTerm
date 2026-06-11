@@ -7,7 +7,6 @@
 //  Created by Miguel de Icaza on 3/20/20.
 //
 
-#if os(macOS)
 import Foundation
 import AppKit
 import CoreText
@@ -36,7 +35,7 @@ class CaretView: NSView, CALayerDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // Enable transparency support for the cursor (matches iOS behavior)
+    // Enable transparency support for the cursor.
     override func makeBackingLayer() -> CALayer {
         let layer = super.makeBackingLayer()
         layer.isOpaque = false
@@ -128,4 +127,3 @@ class CaretView: NSView, CALayerDelegate {
         return nil
     }
 }
-#endif

@@ -339,12 +339,6 @@ public struct CharData: CustomDebugStringConvertible {
     }
 }
 
-#if !(os(iOS) || os(visionOS) || os(macOS) || os(visionOS))
-public class TTImage {
-    
-}
-#endif
-
 /// Represents an image that can be attached to a
 public class ImageCell {
     let image: TTImage

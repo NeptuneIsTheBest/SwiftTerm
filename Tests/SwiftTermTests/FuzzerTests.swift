@@ -4,7 +4,6 @@
 //
 //  Created by Miguel de Icaza on 4/29/21.
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -119,4 +118,3 @@ final class FuzzerTests {
         test ("timeout-8244fb7b31c904aff447c0456cebd79688f142db")
     }
 }
-#endif

@@ -1,6 +1,6 @@
 //
 //  SelectionService.swift
-//  iOS
+//  SwiftTerm
 //
 //  Created by Miguel de Icaza on 3/5/20.
 //  Copyright © 2020 Miguel de Icaza. All rights reserved.
@@ -67,7 +67,7 @@ class SelectionService: CustomDebugStringConvertible {
     }
 
     /**
-     * Used to track the pivot point when selection in iOS-style selection
+     * Used to track the pivot point for handle-style selection.
      */
     public var pivot: Position? 
 
@@ -211,7 +211,7 @@ class SelectionService: CustomDebugStringConvertible {
     }
     
     /**
-     * Implements the iOS selection around the pivot, that is, the handle that is being dragged
+     * Implements selection around the pivot, that is, the handle that is being dragged
      * becomes the pivot point for start/end
      *
      * The row is screen-relative, for buffer relative use the `pivotExtend(bufferPosition:)` overload
@@ -223,7 +223,7 @@ class SelectionService: CustomDebugStringConvertible {
     }
     
     /**
-     * Implements the iOS selection around the pivot, that is, the handle that is being dragged
+     * Implements selection around the pivot, that is, the handle that is being dragged
      * becomes the pivot point for start/end
      *
      * The position is buffer-relative, for screen relative, use `pivotExtend(row:col:)`

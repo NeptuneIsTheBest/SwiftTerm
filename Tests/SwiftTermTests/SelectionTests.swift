@@ -59,8 +59,6 @@ final class SelectionTests: TerminalDelegate {
         #expect(selection.getSelectedText() == "(abc)")
     }
 
-#if os(macOS)
-    // Test only on macOS due to differences in how frames are handled on mac and iOS
     @Test func testMouseHitCorrectWhenScrolled() {
         let view = TerminalView(frame: CGRect(origin: .zero, size: .init(width: 10, height: 10)))
 
@@ -88,7 +86,6 @@ final class SelectionTests: TerminalDelegate {
         #expect(view.terminal.cols == originalCols)
         #expect(view.terminal.rows == originalRows)
     }
-#endif
 
     // MARK: - Selection Tests Ported from Ghostty
 

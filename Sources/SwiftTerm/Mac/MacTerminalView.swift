@@ -3,12 +3,10 @@
 //
 // This is the AppKit version of the TerminalView and holds the state
 // variables in the `TerminalView` class, but as much of the terminal
-// implementation details live in the Apple/AppleTerminalView which
-// contains the shared AppKit/UIKit code
+// implementation details live in Apple/AppleTerminalView.
 //
 //  Created by Miguel de Icaza on 3/4/20.
 //
-#if os(macOS)
 import Foundation
 import AppKit
 import CoreText
@@ -2759,4 +2757,3 @@ extension TerminalViewDelegate {
         return nil
     }
 }
-#endif

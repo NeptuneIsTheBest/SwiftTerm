@@ -6,24 +6,19 @@ Configure fonts, colors, cursor style, and input behavior.
 
 SwiftTerm's ``TerminalView`` exposes a number of properties for customizing the
 terminal's appearance and input handling. This guide covers the most common
-customization points available on both macOS and iOS.
+customization points available on macOS.
 
 ## Fonts
 
-Both the macOS and iOS ``TerminalView`` expose a `font` property. Setting it
-replaces the font used for rendering terminal text:
+``TerminalView`` exposes a `font` property. Setting it replaces the font used
+for rendering terminal text:
 
 ```swift
-// macOS
 terminalView.font = NSFont(name: "SF Mono", size: 14)!
-
-// iOS
-terminalView.font = UIFont(name: "Menlo", size: 14)!
 ```
 
 Under the hood, the view manages a `FontSet` that derives bold, italic, and
-bold-italic variants from the base font. If you need to override individual
-variants on iOS, use `setFonts(normal:bold:italic:boldItalic:)`.
+bold-italic variants from the base font.
 
 Call `resetFontSize()` to return to the default font.
 
@@ -34,8 +29,8 @@ Call `resetFontSize()` to return to the default font.
 The view-level native colors control the default foreground and background:
 
 ```swift
-terminalView.nativeForegroundColor = NSColor.white   // or UIColor.white
-terminalView.nativeBackgroundColor = NSColor.black    // or UIColor.black
+terminalView.nativeForegroundColor = NSColor.white
+terminalView.nativeBackgroundColor = NSColor.black
 ```
 
 ### ANSI Palette
@@ -84,9 +79,6 @@ essential for terminal applications like Emacs that rely on the Meta key:
 terminalView.optionAsMetaKey = true
 ```
 
-On iOS with an external keyboard, the same property is available. The iOS view
-also supports toggling it at runtime with Option-Command-O.
-
 ### Mouse Reporting
 
 By default the view forwards mouse events to the terminal. Set
@@ -126,11 +118,11 @@ Important: `.implicit` means "explicit + implicit fallback", not "implicit only.
 
 Link activation is also gated by `linkHighlightMode`. The reporting mode chooses
 how links are discovered during tracking, while highlight mode decides whether a
-click/tap is allowed to open the link.
+click is allowed to open the link.
 
 ### What happens when the user activates a link
 
-When a click/tap lands on an active link, ``TerminalView`` calls
+When a click lands on an active link, ``TerminalView`` calls
 ``TerminalViewDelegate/requestOpenLink(source:link:params:)``.
 
 - For explicit OSC 8 hyperlinks, `link` is the hyperlink target and `params`
@@ -139,8 +131,6 @@ When a click/tap lands on an active link, ``TerminalView`` calls
   empty.
 - On macOS, the default delegate implementation opens the link with
   `NSWorkspace.shared.open`.
-- On iOS/visionOS, implement `requestOpenLink` in your delegate to decide how
-  to handle navigation (for example, with `UIApplication.open`).
 
 ### macOS behavior
 
@@ -149,16 +139,6 @@ When a click/tap lands on an active link, ``TerminalView`` calls
   hovering enables link preview/highlighting and Command-click opens links.
 - If you switch to `.hover`, link activation does not require Command.
 - `.always` and `.alwaysWithModifier` only activate explicit OSC 8 links.
-
-### iOS and visionOS behavior
-
-- Tracking is driven by `UIPointerInteraction` (iOS 13.4+) and
-  `UIHoverGestureRecognizer` (iOS 13+).
-- The default highlight mode is `.hover`.
-- Single tap opens links only when the current `linkHighlightMode` considers the
-  link active/visible.
-- For modifier-based modes (`.hoverWithModifier`, `.alwaysWithModifier`),
-  activation requires the Command key from a hardware keyboard.
 
 ## Terminal Options
 
@@ -215,8 +195,8 @@ terminalView.useBrightColors = true
 
 ### GPU-Accelerated Rendering
 
-On macOS, iOS, and visionOS, you can switch to a Metal-based rendering path
-that offloads drawing to the GPU. See <doc:GPURendering> for full details.
+On macOS, you can switch to a Metal-based rendering path that offloads drawing
+to the GPU. See <doc:GPURendering> for full details.
 
 ```swift
 // Enable Metal rendering

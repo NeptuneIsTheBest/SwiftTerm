@@ -6,7 +6,6 @@
 //
 //  Created by Miguel de Icaza on 4/24/20.
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -42,4 +41,3 @@ final class MeanTests {
         //XCTAssertTrue(loadAndRun (file: "../../crash-98ce0e0b8d286505f093cca705ac3e2230d2bd80"), "marginTest")
     }
 }
-#endif

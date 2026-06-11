@@ -5,15 +5,9 @@
 //  Created by Codex on 2/1/26.
 //
 
-#if os(macOS)
 import AppKit
 typealias ProgressBarBaseView = NSView
 typealias ProgressBarColor = NSColor
-#elseif os(iOS) || os(visionOS) || os(tvOS)
-import UIKit
-typealias ProgressBarBaseView = UIView
-typealias ProgressBarColor = UIColor
-#endif
 import QuartzCore
 
 final class TerminalProgressBarView: ProgressBarBaseView {
@@ -39,24 +33,13 @@ final class TerminalProgressBarView: ProgressBarBaseView {
     }
 
     private func commonInit() {
-#if os(macOS)
         wantsLayer = true
         layer?.masksToBounds = true
         trackLayer.isHidden = true
         layer?.addSublayer(trackLayer)
         layer?.addSublayer(barLayer)
-#else
-        layer.masksToBounds = true
-        trackLayer.isHidden = true
-        layer.addSublayer(trackLayer)
-        layer.addSublayer(barLayer)
-#endif
-        #if os(iOS) || os(visionOS) || os(tvOS)
-        isUserInteractionEnabled = false
-        #endif
     }
 
-    #if os(macOS)
     override func hitTest(_ point: NSPoint) -> NSView? {
         return nil
     }
@@ -65,12 +48,6 @@ final class TerminalProgressBarView: ProgressBarBaseView {
         super.layout()
         updateForCurrentState(animated: false)
     }
-    #else
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        updateForCurrentState(animated: false)
-    }
-    #endif
 
     func apply(state: Terminal.ProgressReportState, progress: UInt8?) {
         self.state = state
@@ -151,11 +128,7 @@ final class TerminalProgressBarView: ProgressBarBaseView {
         case .pause:
             return .systemOrange
         default:
-            #if os(macOS)
             return .controlAccentColor
-            #else
-            return tintColor ?? .systemBlue
-            #endif
         }
     }
 }

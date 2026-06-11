@@ -1,11 +1,6 @@
-#if !os(iOS)
 import Foundation
 import SwiftTerm
-#if canImport(Darwin)
 import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
 
 fileprivate let debugMessages = false
 fileprivate func debugMessage(_ x: String) {
@@ -118,15 +113,9 @@ class TermcastRecorder {
     
     private func getTerminalSize() -> (width: Int, height: Int) {
         var w = winsize()
-#if os(macOS)
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 {
             return (width: Int(w.ws_col), height: Int(w.ws_row))
         }
-#else
-        if ioctl(STDOUT_FILENO, UInt(TIOCGWINSZ), &w) == 0 {
-            return (width: Int(w.ws_col), height: Int(w.ws_row))
-        }
-#endif
         return (width: 80, height: 24) // Default size
     }
     
@@ -171,17 +160,10 @@ class TermcastRecorder {
         
         // Create raw mode settings
         var rawTermios = originalTermios
-#if os(macOS)
         rawTermios.c_lflag &= ~(UInt(ECHO | ICANON | ISIG | IEXTEN))
         rawTermios.c_iflag &= ~(UInt(IXON | ICRNL | BRKINT | INPCK | ISTRIP))
         rawTermios.c_oflag &= ~(UInt(OPOST))
         rawTermios.c_cflag |= UInt(CS8)
-#else
-        rawTermios.c_lflag &= ~(UInt32(ECHO | ICANON | ISIG | IEXTEN))
-        rawTermios.c_iflag &= ~(UInt32(IXON | ICRNL | BRKINT | INPCK | ISTRIP))
-        rawTermios.c_oflag &= ~(UInt32(OPOST))
-        rawTermios.c_cflag |= UInt32(CS8)
-#endif
         rawTermios.c_cc.16 = 1  // VMIN
         rawTermios.c_cc.17 = 0  // VTIME
         
@@ -363,4 +345,3 @@ extension TermcastRecorder: LocalProcessDelegate {
         return initialWindowSize
     }
 }
-#endif

@@ -4,9 +4,8 @@ Add a terminal emulator to your Swift application.
 
 ## Overview
 
-SwiftTerm provides terminal emulation for macOS, iOS, and visionOS applications.
-This guide walks through adding the dependency and embedding a terminal view on
-each platform.
+SwiftTerm provides terminal emulation for macOS applications. This guide walks
+through adding the dependency and embedding a terminal view.
 
 ## Adding SwiftTerm to Your Project
 
@@ -110,44 +109,6 @@ The key pattern is:
 - Implement ``TerminalViewDelegate/requestOpenLink(source:link:params:)`` to
   control how link taps/clicks are handled.
 
-## iOS: Embedding a Terminal
-
-On iOS, ``TerminalView`` is a `UIScrollView` subclass. The setup is the same as the
-custom data source pattern for macOS — implement ``TerminalViewDelegate`` and wire
-the `send` and `feed` methods:
-
-```swift
-import SwiftTerm
-import UIKit
-
-class TerminalViewController: UIViewController, TerminalViewDelegate {
-    var terminalView: TerminalView!
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        terminalView = TerminalView(frame: view.bounds)
-        terminalView.terminalDelegate = self
-        terminalView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(terminalView)
-    }
-
-    func send(source: TerminalView, data: ArraySlice<UInt8>) {
-        // Forward to your SSH connection or other backend
-    }
-
-    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {}
-    func setTerminalTitle(source: TerminalView, title: String) {}
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
-    func scrolled(source: TerminalView, position: Double) {}
-    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {}
-    func clipboardCopy(source: TerminalView, content: Data) {}
-    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
-}
-```
-
-Since iOS does not support spawning local processes, you will typically connect
-to a remote host via SSH. See <doc:SSHIntegration> for details.
-
 ## Headless: Scripting and Testing
 
 ``HeadlessTerminal`` runs a terminal emulator without any UI, useful for scripting
@@ -174,14 +135,9 @@ See <doc:HeadlessUsage> for more detail.
 
 ## Platform Availability
 
-| Feature | macOS 13+ | iOS 13+ | visionOS 1+ | Linux | Windows |
-|---------|-----------|---------|-------------|-------|---------|
-| Core engine (``Terminal``) | Yes | Yes | Yes | Yes | Yes |
-| AppKit ``TerminalView`` | Yes | — | — | — | — |
-| UIKit ``TerminalView`` | — | Yes | Yes | — | — |
-| Metal GPU rendering | Yes | Yes | Yes | — | — |
-| ``LocalProcess`` | Yes | — | — | Yes | — |
-| ``HeadlessTerminal`` | Yes | — | — | Yes | — |
+SwiftTerm is macOS-only. The package includes the core ``Terminal`` engine,
+AppKit ``TerminalView``, Metal rendering, ``LocalProcess``, and
+``HeadlessTerminal`` for macOS.
 
 ## Next Steps
 

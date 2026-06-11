@@ -95,7 +95,7 @@ Kitty images are cached in memory for re-display. Control the cache size with
 
 ## Implementing Graphics in a Custom Front-End
 
-If you are building a custom front-end (not using the bundled AppKit/UIKit views),
+If you are building a custom front-end (not using the bundled AppKit view),
 implement these ``TerminalDelegate`` methods to handle graphics:
 
 - ``TerminalDelegate/createImageFromBitmap(source:bytes:width:height:)`` —
@@ -106,5 +106,5 @@ implement these ``TerminalDelegate`` methods to handle graphics:
   Called for iTerm2 and Kitty images. Receives encoded image data (PNG, etc.)
   with sizing instructions.
 
-The bundled AppKit and UIKit views implement both of these automatically and
-handle slicing images across terminal rows for rendering.
+The bundled AppKit view implements both of these automatically and handles
+slicing images across terminal rows for rendering.

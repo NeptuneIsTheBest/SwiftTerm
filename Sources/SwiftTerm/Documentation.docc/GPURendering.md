@@ -10,8 +10,7 @@ texture atlas and draws each terminal cell as a GPU quad, offloading the bulk
 of the rendering work to the GPU. This can significantly reduce CPU usage,
 especially for large terminals or applications that update the screen rapidly.
 
-Metal rendering is available on macOS, iOS, and visionOS — any platform where
-MetalKit can be imported. It is **disabled by default**; you opt in
+Metal rendering is available on macOS. It is **disabled by default**; you opt in
 by calling ``TerminalView/setUseMetal(_:)``.
 
 ## Enabling Metal Rendering

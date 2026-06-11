@@ -3,31 +3,24 @@ SwiftTerm
 =========
 
 SwiftTerm is a VT100/Xterm terminal emulator library for Swift applications that can be 
-embedded into macOS, iOS applications, text-based, headless applications or other 
-custom scenarios. It has been used in several commercially available SSH clients, including 
+embedded into macOS AppKit applications, text-based headless tools, or other 
+macOS terminal scenarios. It has been used in several commercially available SSH clients, including 
 [Secure Shellfish](https://apps.apple.com/us/app/secure-shellfish-ssh-files/id1336634154), 
  [La Terminal](https://apps.apple.com/us/app/la-terminal-ssh-client/id1629902861) and [CodeEdit](https://github.com/CodeEditApp/CodeEdit)
 
 Check the [API Documentation](https://migueldeicaza.github.io/SwiftTerm/documentation/swiftterm/)
 
 This repository contains both a terminal emulator engine that is UI agnostic, as well as
-front-ends for this engine for iOS using UIKit, and macOS using AppKit.   A curses-based
+an AppKit front-end for this engine on macOS. A curses-based
 terminal emulator (to emulate an xterm inside a console application) is available as
 part of the [TermKit](https://github.com/migueldeicaza/TermKit) library. 
 
-**Sample Code** There are a couple of minimal sample apps for Mac and iOS showing how to 
-use the library inside the `TerminalApp` directory.   
+**Sample Code** There is a minimal Mac sample app showing how to use the library inside
+the `TerminalApp` directory.
 
 * The sample Mac app has much of the functionality of MacOS' Terminal.app, but without the configuration UI.   
-* The sample iOS application uses an SSH library to connect to a remote system (as there is no native shell
-on iOS to run) and includes a login UI to configure the connection. 
 
 ## Companion Apps
-
-[SwiftTermApp](https://github.com/migueldeicaza/SwiftTermApp) builds
-an actual iOS app that uses this library and is more complete than the
-testing apps in this module and provides a proper configuration UI.
-It is a proof of concept for what you would need to do.
 
 [Pane](https://github.com/migueldeicaza/pane) is a terminal
 multiplexor, similar to tmux.
@@ -51,7 +44,7 @@ Features
 * Pretty decent terminal emulation, on or better than XtermSharp and xterm.js (and more comprehensive in many ways)
 * Unicode rendering (including Emoji, and combining characters and emoji)
 * Reusable and pluggable engine allows multiple user interfaces to be built on top of it:
-   *  Bundled MacOS and iOS
+   *  Bundled macOS AppKit view
    *  Bundled Headless terminal.
    *  [TermKit](https://github.com/migueldeicaza/TermKit) contains a terminal-over-a-terminal
    *  [Pane](https://github.com/migueldeicaza/pane) implements a terminal multiplexor
@@ -71,18 +64,16 @@ Features
 * Terminal session recording and playback with termcast
 * Thread-safe Terminal instances
 * Fuzzed and abused
-* Optional GPU-accelerated rendering via Metal (macOS, iOS, visionOS)
+* Optional GPU-accelerated rendering via Metal on macOS
 * Seems pretty fast to me
 
 # SwiftTerm library
 
-The SwiftTerm library itself contains the source code for both
-the engine and the front-ends.  The front-ends are conditionally
-compiled based on the target platform.
+The SwiftTerm library itself contains the source code for both the engine and
+the macOS AppKit front-end.
 
-The engine is in this directory, while code for macOS lives under `Mac`, and
-code for iOS, lives under `iOS`.    Given that those two share a lot of common 
-traits, the shared code is under `Apple`.
+The engine is in this directory, macOS-specific code lives under `Mac`, and
+shared AppKit rendering support lives under `Apple`.
 
 ## Using SwiftTerm
 
@@ -100,24 +91,9 @@ to host a local Unix command, so I have included
  which is an implementation that connects
 the `TerminalView` to a Unix pseudo-terminal and runs a command there.
 
-## iOS UIView
-There is an equivalent UIKit UIView implementation for
-[`TerminalView`](https://migueldeicaza.github.io/SwiftTermDocs/documentation/swiftterm/terminalview)
-which like its NSView companion is an embeddable and reusable view
-that can be connected to your application by implementing the same
-TerminalViewDelegate.  Unlike the NSView case running on a Mac, where
-a common scenario will be to run local commands, given that iOS does
-not offer access to processes, the most common scenario will be to
-wire up this terminal to a remote host.  And the safest way of
-connecting to a remote system is with SSH.
-
-## Shared Code between MacOS and iOS
-
-The iOS and UIKit code share a lot of the code, that code lives under the Apple directory.
-
 ### Link Reporting in Apple Views
 
-Both AppKit and UIKit `TerminalView` expose `linkReporting`:
+The AppKit `TerminalView` exposes `linkReporting`:
 
 * `.none` disables link tracking.
 * `.explicit` tracks only explicit OSC 8 hyperlinks.
@@ -127,18 +103,15 @@ Both AppKit and UIKit `TerminalView` expose `linkReporting`:
 
 When the user activates a link, `TerminalView` calls `TerminalViewDelegate.requestOpenLink(source:link:params:)`.
 For explicit OSC 8 hyperlinks, `params` includes parsed key/value metadata (if provided); implicit links use empty `params`.
-On macOS, the default delegate implementation opens links via `NSWorkspace`. On iOS/visionOS, handle `requestOpenLink` in your delegate.
+The default delegate implementation opens links via `NSWorkspace`.
 
-* On macOS, tracking is hover-based. The default highlight mode is `.hoverWithModifier`, so Command-hover and Command-click are the default link interaction.
-* On iOS/visionOS, tracking is driven by pointer/hover interactions (`UIPointerInteraction` / `UIHoverGestureRecognizer`), and tap activation depends on the active `linkHighlightMode` (including modifier requirements for modifier-based modes).
+Tracking is hover-based. The default highlight mode is `.hoverWithModifier`, so Command-hover and Command-click are the default link interaction.
 
 ## Using SSH
 The core library currently does not provide a convenient way to connect to SSH, purely
-to avoid the additional dependency. The iOS sample app demonstrates how to integrate SSH
-using a modern SSH stack with [swift-nio-ssh](https://github.com/apple/swift-nio-ssh). See
-[`UIKitSshTerminalView`](https://github.com/migueldeicaza/SwiftTerm/blob/main/TerminalApp/iOSTerminal/UIKitSshTerminalView.swift)
-and [`SSHLoginView`](https://github.com/migueldeicaza/SwiftTerm/blob/main/TerminalApp/iOSTerminal/SSHLoginView.swift)
-for an example of connecting the `TerminalView` for iOS to an SSH connection.
+to avoid the additional dependency. To integrate SSH, implement
+`TerminalViewDelegate.send(source:data:)` to forward input to your SSH channel,
+and feed channel output back with `TerminalView.feed(byteArray:)`.
 
 ## Termcast - Terminal Recording and Playback
 
@@ -189,13 +162,8 @@ The playback will show the recorded terminal session with proper timing, includi
 Working on SwiftTerm
 ====================
 
-If you are using Xcode, there are two toplevel projects, one for Mac
-and one for iOS in the TerminalApp directory, one called "iOSTerminal.xcodeproj"
-and one called "MacTerminal.xcodeproj".  
-
-This is needed because Xcode does not provide code completion for iOS if you 
-have a Mac project in the project.   So I had to split them up.   Both 
-projects reference the same SwiftTerm package.
+If you are using Xcode, the Mac sample app lives in
+`TerminalApp/MacTerminal.xcodeproj`.
 
 When working with these projects, if you choose the terminal application
 it will run this one.   To run the test suite, select the 'SwiftTerm' target
@@ -237,10 +205,6 @@ Supports hyperlinks emitted by modern apps:
 
 <img width="674" alt="image" src="https://user-images.githubusercontent.com/36863/80055972-0b500600-84f1-11ea-9c57-41cadce67162.png">
 
-iOS support:
-
-<img width="981" alt="image" src="https://user-images.githubusercontent.com/36863/80056069-54a05580-84f1-11ea-8597-5a227c9c64a7.png">
-
 Sixel support:
 
 <img width="770" alt="image" src="https://user-images.githubusercontent.com/36863/115647346-97a62c00-a2f1-11eb-929a-f9d942cc0c09.png">
@@ -260,7 +224,6 @@ Additional and useful documents:
 * [VT330/VT340 Programmer Reference Manual Volume 2: Graphics Programming](https://vt100.net/docs/vt3xx-gp/contents.html)
 * [A parser for DEC’s ANSI-compatible video terminals](https://vt100.net/emu/dec_ansi_parser)
 * [Codes and Standards](https://vt100.net/emu/)
-* [Linux Console Docs](http://man7.org/linux/man-pages/man4/console_codes.4.html) they are a subset of vt100, but often simple to follow.
 * [Sixel Graphics](https://github.com/saitoha/libsixel)
 
 Test suites:

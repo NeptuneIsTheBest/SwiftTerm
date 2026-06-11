@@ -3,7 +3,6 @@
 //  
 // Tests for assorted rendering capabilities
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -727,4 +726,3 @@ final class SwiftTermUnicode {
     }
 
 }
-#endif

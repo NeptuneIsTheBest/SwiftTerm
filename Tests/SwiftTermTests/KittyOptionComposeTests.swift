@@ -8,7 +8,6 @@
 //  reportAllKeys/reportAlternates without reportText. Previously the kitty
 //  encoder keyed off the base-layout codepoint and dropped the composed glyph.
 //
-#if os(macOS)
 import AppKit
 import Testing
 @testable import SwiftTerm
@@ -76,4 +75,3 @@ final class KittyOptionComposeTests {
         #expect(delegate.sent == Array("@".utf8))
     }
 }
-#endif

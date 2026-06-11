@@ -4,7 +4,6 @@
 //
 //  Created by Miguel de Icaza on 4/13/20.
 //
-#if os(macOS)
 import Foundation
 import Testing
 
@@ -397,4 +396,3 @@ final class SwiftTermOsc {
         // Should process without crashing
     }
 }
-#endif

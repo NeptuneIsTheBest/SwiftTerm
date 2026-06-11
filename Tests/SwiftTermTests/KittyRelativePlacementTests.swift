@@ -1,7 +1,6 @@
 //
 //  KittyRelativePlacementTests.swift
 //
-#if os(macOS)
 import Testing
 
 @testable import SwiftTerm
@@ -105,4 +104,3 @@ final class KittyRelativePlacementTests {
         #expect(childImage.kittyRow == newChildRow)
     }
 }
-#endif

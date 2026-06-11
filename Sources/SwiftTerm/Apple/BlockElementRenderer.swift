@@ -1,11 +1,6 @@
-#if os(macOS) || os(iOS) || os(visionOS)
 import CoreGraphics
 import Foundation
-#if os(iOS) || os(visionOS)
-import UIKit
-#elseif os(macOS)
 import AppKit
-#endif
 
 enum BlockAlpha: CGFloat {
     case full = 1.0
@@ -102,4 +97,3 @@ struct BlockElementRenderItem {
     let rects: [BlockElementRect]
     let foregroundColor: TTColor
 }
-#endif
