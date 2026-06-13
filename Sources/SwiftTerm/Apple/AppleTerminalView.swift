@@ -1562,14 +1562,14 @@ extension TerminalView {
                     let clampedStart = max(0, min(absStart, maxRow))
                     let clampedEnd = max(0, min(absEnd, maxRow))
                     if clampedStart <= clampedEnd {
-                        metalDirtyRange = clampedStart...clampedEnd
+                        markMetalDirtyRange(clampedStart...clampedEnd)
                     } else if visibleStart <= visibleEnd {
-                        metalDirtyRange = visibleStart...visibleEnd
+                        markMetalDirtyRange(visibleStart...visibleEnd)
                     } else {
                         metalDirtyRange = nil
                     }
                 } else if visibleStart <= visibleEnd {
-                    metalDirtyRange = visibleStart...visibleEnd
+                    markMetalDirtyRange(visibleStart...visibleEnd)
                 } else {
                     metalDirtyRange = nil
                 }
@@ -1652,6 +1652,17 @@ extension TerminalView {
     }
 
 #if canImport(MetalKit)
+    func markMetalDirtyRange(_ range: ClosedRange<Int>?) {
+        guard let range else {
+            return
+        }
+        if let existing = metalDirtyRange {
+            metalDirtyRange = min(existing.lowerBound, range.lowerBound)...max(existing.upperBound, range.upperBound)
+        } else {
+            metalDirtyRange = range
+        }
+    }
+
     func requestMetalDisplay() {
         guard let metalView = metalView else {
             return

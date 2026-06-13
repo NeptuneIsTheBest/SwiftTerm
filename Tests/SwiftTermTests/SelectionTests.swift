@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(MetalKit)
+import MetalKit
+#endif
 import Testing
 
 @testable import SwiftTerm
@@ -86,6 +89,68 @@ final class SelectionTests: TerminalDelegate {
         #expect(view.terminal.cols == originalCols)
         #expect(view.terminal.rows == originalRows)
     }
+
+#if canImport(MetalKit)
+    private func visibleMetalRows(in view: TerminalView) -> ClosedRange<Int>? {
+        let buffer = view.terminal.displayBuffer
+        guard buffer.lines.count > 0 else {
+            return nil
+        }
+        let maxRow = buffer.lines.count - 1
+        let visibleStart = buffer.yDisp
+        let visibleEnd = min(maxRow, buffer.yDisp + buffer.rows - 1)
+        guard visibleStart <= visibleEnd else {
+            return nil
+        }
+        return visibleStart...visibleEnd
+    }
+
+    private func attachDummyMetalView(to view: TerminalView) {
+        view.metalView = MTKView(frame: view.bounds, device: nil)
+        view.metalDirtyRange = nil
+        view.resetMetalSelectionRowsSnapshot()
+    }
+
+    @Test func testMetalSelectionShrinkWithoutPriorSnapshotDirtiesVisibleRows() {
+        let view = TerminalView(frame: CGRect(origin: .zero, size: .init(width: 640, height: 320)))
+        guard let visibleRows = visibleMetalRows(in: view), visibleRows.upperBound - visibleRows.lowerBound >= 4 else {
+            #expect(Bool(false), "Expected enough visible rows for Metal selection test")
+            return
+        }
+
+        let startRow = visibleRows.lowerBound + 1
+        let originalEndRow = visibleRows.lowerBound + 4
+        let shrunkenEndRow = visibleRows.lowerBound + 2
+        view.selection.setSelection(start: Position(col: 0, row: startRow),
+                                    end: Position(col: 0, row: originalEndRow))
+        attachDummyMetalView(to: view)
+
+        view.selection.setSelection(start: Position(col: 0, row: startRow),
+                                    end: Position(col: 0, row: shrunkenEndRow))
+
+        #expect(view.metalDirtyRange == visibleRows)
+        #expect(view.lastMetalSelectionRows == startRow...shrunkenEndRow)
+        #expect(view.hasMetalSelectionRowsSnapshot)
+    }
+
+    @Test func testMetalSelectionClearWithoutPriorSnapshotDirtiesVisibleRows() {
+        let view = TerminalView(frame: CGRect(origin: .zero, size: .init(width: 640, height: 320)))
+        guard let visibleRows = visibleMetalRows(in: view), visibleRows.upperBound - visibleRows.lowerBound >= 4 else {
+            #expect(Bool(false), "Expected enough visible rows for Metal selection test")
+            return
+        }
+
+        view.selection.setSelection(start: Position(col: 0, row: visibleRows.lowerBound + 1),
+                                    end: Position(col: 0, row: visibleRows.lowerBound + 4))
+        attachDummyMetalView(to: view)
+
+        view.selection.selectNone()
+
+        #expect(view.metalDirtyRange == visibleRows)
+        #expect(view.lastMetalSelectionRows == nil)
+        #expect(view.hasMetalSelectionRowsSnapshot)
+    }
+#endif
 
     // MARK: - Selection Tests Ported from Ghostty
 

@@ -135,6 +135,12 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     /// word jumps, which would otherwise leave the cursor visually stuck
     /// because `MTKView` is paused and only redraws on demand.
     var lastRenderedCursor: (x: Int, y: Int, hidden: Bool)?
+    /// The selection rows last submitted to the Metal renderer. Used to
+    /// avoid invalidating every visible row while a selection is dragged.
+    var lastMetalSelectionRows: ClosedRange<Int>?
+    /// Distinguishes "known no selection" from "selection state has not been
+    /// synchronized with the current Metal row cache yet".
+    var hasMetalSelectionRowsSnapshot = false
     /// Controls how the Metal renderer builds GPU buffers each frame.
     ///
     /// The default is ``MetalBufferingMode/perRowPersistent``, which caches
@@ -306,6 +312,7 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             metalView = mtkView
             metalRenderer = renderer
             metalBoundWindow = window
+            resetMetalSelectionRowsSnapshot()
             needsDisplay = false
             mtkView.setNeedsDisplay(mtkView.bounds)
         } else {
@@ -314,6 +321,7 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             metalView = nil
             metalRenderer = nil
             metalBoundWindow = nil
+            resetMetalSelectionRowsSnapshot()
             if let caretView = caretView {
                 caretView.isHidden = false
                 caretView.updateCursorStyle()
@@ -324,6 +332,26 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
 
     func metalRenderingScaleFactor() -> CGFloat {
         max(1, metalScaleFactorOverride ?? backingScaleFactor())
+    }
+
+    func currentMetalSelectionRows(in buffer: Buffer) -> ClosedRange<Int>? {
+        guard buffer.lines.count > 0, selection.active, selection.hasSelectionRange else {
+            return nil
+        }
+        let maxRow = buffer.lines.count - 1
+        let start = max(0, min(selection.start.row, maxRow))
+        let end = max(0, min(selection.end.row, maxRow))
+        return min(start, end)...max(start, end)
+    }
+
+    func recordMetalSelectionRowsSnapshot(in buffer: Buffer) {
+        lastMetalSelectionRows = currentMetalSelectionRows(in: buffer)
+        hasMetalSelectionRowsSnapshot = true
+    }
+
+    func resetMetalSelectionRowsSnapshot() {
+        lastMetalSelectionRows = nil
+        hasMetalSelectionRowsSnapshot = false
     }
 
     /// Builds an MTKView configured for terminal rendering. Used by both
@@ -416,6 +444,7 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         // the old view is removed. Force a synchronous draw, plus a
         // `setNeedsDisplay` belt-and-braces in case the synchronous draw bails
         // out (e.g. the new layer hasn't acquired its first drawable yet).
+        resetMetalSelectionRowsSnapshot()
         insertMetalView(newView, replacing: oldView)
         newView.draw()
         newView.setNeedsDisplay(newView.bounds)
@@ -442,6 +471,7 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         metalRenderer = nil
         metalBoundWindow = nil
         useMetalRenderer = false
+        resetMetalSelectionRowsSnapshot()
         if let caretView = caretView {
             caretView.isHidden = false
             caretView.updateCursorStyle()
@@ -2135,13 +2165,40 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             let buffer = terminal.displayBuffer
             if buffer.lines.count == 0 {
                 metalDirtyRange = nil
+                resetMetalSelectionRowsSnapshot()
             } else {
-                let startRow = buffer.yDisp
-                let endRow = min(buffer.lines.count - 1, buffer.yDisp + buffer.rows - 1)
-                if startRow <= endRow {
-                    metalDirtyRange = startRow...endRow
-                } else {
-                    metalDirtyRange = nil
+                let maxRow = buffer.lines.count - 1
+                let visibleStart = buffer.yDisp
+                let visibleEnd = min(maxRow, buffer.yDisp + buffer.rows - 1)
+                let currentSelectionRows = currentMetalSelectionRows(in: buffer)
+                let oldSelectionRows = lastMetalSelectionRows
+                let hadSelectionSnapshot = hasMetalSelectionRowsSnapshot
+                lastMetalSelectionRows = currentSelectionRows
+                hasMetalSelectionRowsSnapshot = true
+
+                if visibleStart <= visibleEnd {
+                    let dirtyRows: ClosedRange<Int>? = {
+                        guard hadSelectionSnapshot else {
+                            return visibleStart...visibleEnd
+                        }
+                        switch (oldSelectionRows, currentSelectionRows) {
+                        case let (old?, current?):
+                            return min(old.lowerBound, current.lowerBound)...max(old.upperBound, current.upperBound)
+                        case let (old?, nil):
+                            return old
+                        case let (nil, current?):
+                            return current
+                        case (nil, nil):
+                            return nil
+                        }
+                    }()
+                    if let dirtyRows {
+                        let lower = max(visibleStart, dirtyRows.lowerBound)
+                        let upper = min(visibleEnd, dirtyRows.upperBound)
+                        if lower <= upper {
+                            markMetalDirtyRange(lower...upper)
+                        }
+                    }
                 }
             }
             queueMetalDisplay()
