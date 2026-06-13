@@ -1235,7 +1235,7 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                     let underlineStyle = resolveUnderlineStyle(runAttributes)
                     let underlineColor = (runAttributes[.underlineColor] as? TTColor) ?? terminalView.nativeForegroundColor
                     let underlineColorSIMD = colorToSIMD(underlineColor)
-                    let thickness = underlineThickness * scale
+                    let metrics = underlineDecorationMetrics(thicknessPoints: underlineThickness, scale: scale)
                     let segmentStyle: UnderlineStyle = underlineStyle == .double ? .single : underlineStyle
 
                     for (glyphIndex, ctPos) in run.shaperRun.positions.enumerated() {
@@ -1248,10 +1248,9 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                         appendUnderlineSegments(x0: x0,
                                                 x1: x1,
                                                 yCenter: yCenter,
-                                                thickness: thickness,
+                                                metrics: metrics,
                                                 color: underlineColorSIMD,
                                                 style: segmentStyle,
-                                                patternScale: scale,
                                                 renderMode: renderMode,
                                                 clipRect: clipRect,
                                                 pivotY: pivotY,
@@ -1261,10 +1260,9 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                             appendUnderlineSegments(x0: x0,
                                                     x1: x1,
                                                     yCenter: yDouble,
-                                                    thickness: thickness,
+                                                    metrics: metrics,
                                                     color: underlineColorSIMD,
                                                     style: segmentStyle,
-                                                    patternScale: scale,
                                                     renderMode: renderMode,
                                                     clipRect: clipRect,
                                                     pivotY: pivotY,
@@ -1289,6 +1287,7 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                     let isDouble = style.contains(.double)
                     let strikeThickness = max(round(scale * CTFontGetUnderlineThickness(ctFont)) / scale, 0.5)
                     let strikePosition = (CTFontGetXHeight(ctFont) + strikeThickness) * 0.5
+                    let metrics = strikethroughDecorationMetrics(thicknessPoints: strikeThickness, scale: scale)
 
                     for (glyphIndex, ctPos) in run.shaperRun.positions.enumerated() {
                         let glyphColumn = startColumn + (glyphIndex * shaped.segment.columnWidth)
@@ -1297,14 +1296,12 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                         let x0 = basePos.x * scale
                         let x1 = (basePos.x + decorationCellWidth) * scale
                         let yCenter = (basePos.y + strikePosition) * scale
-                        let thickness = strikeThickness * scale
                         appendUnderlineSegments(x0: x0,
                                                 x1: x1,
                                                 yCenter: yCenter,
-                                                thickness: thickness,
+                                                metrics: metrics,
                                                 color: strikeColorSIMD,
                                                 style: strikeStyle,
-                                                patternScale: scale,
                                                 renderMode: renderMode,
                                                 clipRect: clipRect,
                                                 pivotY: pivotY,
@@ -1314,10 +1311,9 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                             appendUnderlineSegments(x0: x0,
                                                     x1: x1,
                                                     yCenter: yDouble,
-                                                    thickness: thickness,
+                                                    metrics: metrics,
                                                     color: strikeColorSIMD,
                                                     style: strikeStyle,
-                                                    patternScale: scale,
                                                     renderMode: renderMode,
                                                     clipRect: clipRect,
                                                     pivotY: pivotY,
@@ -2161,7 +2157,7 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         let attributes = terminalView.getAttributedValue(charData.attribute,
                                                          usingFg: terminalView.caretColor,
                                                          andBg: caretTextColor) ?? [.font: terminalView.fontSet.normal]
-        let attributedString = NSAttributedString(string: String(charData.getCharacter()), attributes: attributes)
+        let attributedString = NSAttributedString(string: String(terminalView.terminal.getCharacter(for: charData)), attributes: attributes)
         let ctline = CTLineCreateWithAttributedString(attributedString)
         guard let runs = CTLineGetGlyphRuns(ctline) as? [CTRun] else {
             return (colorVertices, [], [])
@@ -2460,21 +2456,58 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                       height: height)
     }
 
+    private struct DecorationMetrics {
+        let thickness: CGFloat
+        let dashLength: CGFloat
+        let dashGapLength: CGFloat
+        let dotLength: CGFloat
+        let dotGapLength: CGFloat
+        let curlyAmplitude: CGFloat
+        let curlyWavelength: CGFloat
+        let curlyStep: CGFloat
+    }
+
+    private func underlineDecorationMetrics(thicknessPoints: CGFloat, scale: CGFloat) -> DecorationMetrics {
+        let thickness = thicknessPoints * scale
+        let point = scale
+        let dashLength = max(thickness * 2, point * 2)
+        let dotLength = max(thickness, point)
+        return DecorationMetrics(thickness: thickness,
+                                 dashLength: dashLength,
+                                 dashGapLength: dashLength,
+                                 dotLength: dotLength,
+                                 dotGapLength: dotLength * 2,
+                                 curlyAmplitude: max(thickness, point),
+                                 curlyWavelength: max(thickness * 4, point * 4),
+                                 curlyStep: max(thickness, point))
+    }
+
+    private func strikethroughDecorationMetrics(thicknessPoints: CGFloat, scale: CGFloat) -> DecorationMetrics {
+        let thickness = thicknessPoints * scale
+        let dashLength = 2 * scale
+        let dotLength = max(thickness, scale)
+        return DecorationMetrics(thickness: thickness,
+                                 dashLength: dashLength,
+                                 dashGapLength: dashLength,
+                                 dotLength: dotLength,
+                                 dotGapLength: dotLength * 2,
+                                 curlyAmplitude: max(thickness, scale),
+                                 curlyWavelength: max(thickness * 4, scale * 4),
+                                 curlyStep: max(thickness, scale))
+    }
+
     private func appendUnderlineSegments(x0: CGFloat,
                                          x1: CGFloat,
                                          yCenter: CGFloat,
-                                         thickness: CGFloat,
+                                         metrics: DecorationMetrics,
                                          color: SIMD4<Float>,
                                          style: UnderlineStyle,
-                                         patternScale: CGFloat,
                                          renderMode: BufferLine.RenderLineMode,
                                          clipRect: ClipRect?,
                                          pivotY: CGFloat,
                                          output: inout [ColorCell]) {
-        let half = thickness / 2
+        let half = metrics.thickness / 2
         let baseY = yCenter
-        let dashLength = max(thickness * 2, patternScale * 2)
-        let dotLength = max(thickness, patternScale)
 
         func emitSegment(start: CGFloat, end: CGFloat, centerY: CGFloat) {
             let y0 = centerY - half
@@ -2491,20 +2524,17 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
 
         switch style {
         case .curly:
-            let amplitude = max(thickness, patternScale)
-            let wavelength = max(thickness * 4, patternScale * 4)
-            let step = max(thickness, patternScale)
             var x = x0
             while x < x1 {
-                let phase = Double((x - x0) / wavelength * (CGFloat.pi * 2))
-                let y = baseY + amplitude * CGFloat(sin(phase))
-                let end = min(x + step, x1)
+                let phase = Double((x - x0) / metrics.curlyWavelength * (CGFloat.pi * 2))
+                let y = baseY + metrics.curlyAmplitude * CGFloat(sin(phase))
+                let end = min(x + metrics.curlyStep, x1)
                 emitSegment(start: x, end: end, centerY: y)
                 x = end
             }
         case .dotted, .dashed:
-            let segmentLength = style == .dotted ? dotLength : dashLength
-            let gapLength = style == .dotted ? (dotLength * 2) : dashLength
+            let segmentLength = style == .dotted ? metrics.dotLength : metrics.dashLength
+            let gapLength = style == .dotted ? metrics.dotGapLength : metrics.dashGapLength
             var start = x0
             while start < x1 {
                 let end = min(start + segmentLength, x1)
