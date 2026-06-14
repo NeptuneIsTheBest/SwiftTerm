@@ -38,7 +38,9 @@ final class SynchronizedOutputTests {
         ).replacingOccurrences(of: "\u{0}", with: " ")
     }
 
-    @Test func testSynchronizedOutputBlocksDisplayUntilReset() {
+    /// Synchronized output suppresses view repainting, but Terminal keeps the
+    /// live buffer moving; displayBuffer is not a frozen snapshot.
+    @Test func testSynchronizedOutputKeepsLiveBufferUpdatingWhileActive() {
         let terminal = Terminal(
             delegate: TestDelegate(),
             options: TerminalOptions(cols: 20, rows: 5, scrollback: 0)
@@ -49,17 +51,20 @@ final class SynchronizedOutputTests {
         #expect(topLineText(from: terminal.displayBuffer).hasPrefix("OLD"))
 
         terminal.feed(text: "\(esc)[?2026h")
+        #expect(terminal.synchronizedOutputActive)
+
         terminal.feed(text: "\(esc)[2J\(esc)[HNEW")
 
-        #expect(topLineText(from: terminal.displayBuffer).hasPrefix("OLD"))
         #expect(topLineText(from: terminal.buffer).hasPrefix("NEW"))
+        #expect(topLineText(from: terminal.displayBuffer).hasPrefix("NEW"))
 
         terminal.feed(text: "\(esc)[?2026l")
+        #expect(!terminal.synchronizedOutputActive)
         #expect(topLineText(from: terminal.displayBuffer).hasPrefix("NEW"))
     }
 
-    /// Regression: setViewYDisp must update both live and frozen buffers
-    /// during synchronized output so user-initiated scrolling is not dropped.
+    /// Regression: setViewYDisp must keep the live buffer and displayBuffer
+    /// viewport aligned during synchronized output so scrolling is not dropped.
     @Test func testViewportScrollDuringSyncUpdatesBothBuffers() {
         let terminal = Terminal(
             delegate: TestDelegate(),
