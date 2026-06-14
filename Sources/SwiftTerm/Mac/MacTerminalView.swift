@@ -141,6 +141,9 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     /// Distinguishes "known no selection" from "selection state has not been
     /// synchronized with the current Metal row cache yet".
     var hasMetalSelectionRowsSnapshot = false
+    /// Bumped when renderer-wide visual state changes without mutating
+    /// BufferLine generations, such as palette, font, or custom glyph settings.
+    var metalRenderRevision: UInt64 = 0
     /// Controls how the Metal renderer builds GPU buffers each frame.
     ///
     /// The default is ``MetalBufferingMode/perRowPersistent``, which caches
@@ -352,6 +355,11 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     func resetMetalSelectionRowsSnapshot() {
         lastMetalSelectionRows = nil
         hasMetalSelectionRowsSnapshot = false
+    }
+
+    func bumpMetalRenderRevision() {
+        metalRenderRevision &+= 1
+        resetMetalSelectionRowsSnapshot()
     }
 
     /// Builds an MTKView configured for terminal rendering. Used by both
@@ -607,6 +615,9 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             _nativeFg = newValue
             terminal.foregroundColor = nativeForegroundColor.getTerminalColor ()
             settingFg = false
+#if canImport(MetalKit)
+            bumpMetalRenderRevision()
+#endif
         }
     }
 
@@ -623,15 +634,30 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
             _nativeBg = newValue
             terminal.backgroundColor = nativeBackgroundColor.getTerminalColor ()
             settingBg = false
+#if canImport(MetalKit)
+            bumpMetalRenderRevision()
+#endif
         }
     }
     
     /// Controls weather to use high ansi colors, if false terminal will use bold text instead of high ansi colors
-    public var useBrightColors: Bool = true
+    public var useBrightColors: Bool = true {
+        didSet {
+            guard oldValue != useBrightColors else { return }
+#if canImport(MetalKit)
+            bumpMetalRenderRevision()
+#endif
+            terminal.updateFullScreen()
+            queuePendingDisplay()
+        }
+    }
 
     /// When true, block element (U+2580-U+259F) and box drawing (U+2500-U+257F) characters use custom rendering.
     public var customBlockGlyphs: Bool = true {
         didSet {
+#if canImport(MetalKit)
+            bumpMetalRenderRevision()
+#endif
             terminal.updateFullScreen()
             queuePendingDisplay()
         }
@@ -640,6 +666,9 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     /// When true, custom block/box glyphs use anti-aliasing instead of pixel-aligned edges.
     public var antiAliasCustomBlockGlyphs: Bool = false {
         didSet {
+#if canImport(MetalKit)
+            bumpMetalRenderRevision()
+#endif
             terminal.updateFullScreen()
             queuePendingDisplay()
         }
@@ -666,6 +695,9 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
         }
         set {
             _selectedTextBackgroundColor = newValue
+#if canImport(MetalKit)
+            bumpMetalRenderRevision()
+#endif
         }
     }
 

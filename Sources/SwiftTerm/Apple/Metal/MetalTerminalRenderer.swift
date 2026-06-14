@@ -169,7 +169,14 @@ struct CacheSignature: Hashable {
     let fontName: String
     let fontSize: Double
     let isAltBuffer: Bool
+    let renderRevision: UInt64
     let kittyStamp: KittyCacheStamp
+}
+
+struct FastGlyphKey: Hashable {
+    let fontName: String
+    let size: CGFloat
+    let scalar: UInt16
 }
 
 final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
@@ -197,6 +204,8 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
     private let rasterizer = CoreTextGlyphRasterizer()
     private var glyphCache: [GlyphKey: GlyphEntry] = [:]
     private var scaledFontCache: [GlyphKey: CTFont] = [:]
+    private var fastGlyphCache: [FastGlyphKey: CGGlyph] = [:]
+    private var fastAttributeCache: [Attribute: FastResolvedAttributes] = [:]
     private var customGlyphCache: [CustomGlyphKey: CustomGlyphEntry] = [:]
     private let imageTextureCache = NSMapTable<AnyObject, MTLTexture>(keyOptions: .weakMemory, valueOptions: .strongMemory)
     private var kittyTextureCache: [UInt32: (signature: KittyImageSignature, texture: MTLTexture)] = [:]
@@ -220,6 +229,19 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
     private var imageTextureFailures: Set<ObjectIdentifier> = []
     private var kittyTextureFailures: Set<UInt32> = []
 #endif
+
+    private struct FastResolvedAttributes {
+        let font: TTFont
+        let foreground: SIMD4<Float>
+        let background: SIMD4<Float>
+        let fillsTrailingMargin: Bool
+        let underlineStyle: UnderlineStyle
+        let underlineColor: SIMD4<Float>
+        let strikethroughStyle: UnderlineStyle
+        let strikethroughColor: SIMD4<Float>
+        let strikethroughPosition: CGFloat
+        let strikethroughMetrics: DecorationMetrics
+    }
 
     init(view: MTKView, terminalView: TerminalView) throws {
         guard let device = view.device ?? MTLCreateSystemDefaultDevice() else {
@@ -612,10 +634,12 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                                        fontName: terminalView.fontSet.normal.fontName,
                                        fontSize: Double(terminalView.fontSet.normal.pointSize),
                                        isAltBuffer: terminalView.terminal.isCurrentBufferAlternate,
+                                       renderRevision: terminalView.metalRenderRevision,
                                        kittyStamp: kittyStamp)
         let signatureChanged = signature != cacheSignature
         if signatureChanged {
             rowCache.removeAll()
+            fastAttributeCache.removeAll()
             cacheSignature = signature
         }
 
@@ -632,14 +656,20 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         var rows: [RowDrawBuffers] = []
         var frameData: FrameDrawData?
         if bufferingMode == .perFrameAggregated {
-            frameData = FrameDrawData(backgroundCells: [],
-                                      glyphCellsGray: [],
-                                      glyphCellsColor: [],
-                                      decorationCells: [],
-                                      underImageDraws: [],
-                                      placeholderImageDraws: [],
-                                      overImageDraws: [],
-                                      otherImageDraws: [])
+            let visibleRowCount = max(0, lastRow - firstRow + 1)
+            var data = FrameDrawData(backgroundCells: [],
+                                     glyphCellsGray: [],
+                                     glyphCellsColor: [],
+                                     decorationCells: [],
+                                     underImageDraws: [],
+                                     placeholderImageDraws: [],
+                                     overImageDraws: [],
+                                     otherImageDraws: [])
+            data.backgroundCells.reserveCapacity(visibleRowCount * 4)
+            data.glyphCellsGray.reserveCapacity(visibleRowCount * buffer.cols)
+            data.glyphCellsColor.reserveCapacity(max(visibleRowCount, 8))
+            data.decorationCells.reserveCapacity(visibleRowCount)
+            frameData = data
         }
         let isAltBuffer = terminalView.terminal.isCurrentBufferAlternate
         var virtualPlacementsByImageId: [UInt32: [KittyPlacementRecord]] = [:]
@@ -740,17 +770,14 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                 rows.append(rowBuffers)
             }
             if bufferingMode == .perFrameAggregated {
-                if var currentFrame = frameData {
-                    currentFrame.backgroundCells.append(contentsOf: rowData.backgroundCells)
-                    currentFrame.glyphCellsGray.append(contentsOf: rowData.glyphCellsGray)
-                    currentFrame.glyphCellsColor.append(contentsOf: rowData.glyphCellsColor)
-                    currentFrame.decorationCells.append(contentsOf: rowData.decorationCells)
-                    currentFrame.underImageDraws.append(contentsOf: rowData.underImageDraws)
-                    currentFrame.placeholderImageDraws.append(contentsOf: rowData.placeholderImageDraws)
-                    currentFrame.overImageDraws.append(contentsOf: rowData.overImageDraws)
-                    currentFrame.otherImageDraws.append(contentsOf: rowData.otherImageDraws)
-                    frameData = currentFrame
-                }
+                frameData!.backgroundCells.append(contentsOf: rowData.backgroundCells)
+                frameData!.glyphCellsGray.append(contentsOf: rowData.glyphCellsGray)
+                frameData!.glyphCellsColor.append(contentsOf: rowData.glyphCellsColor)
+                frameData!.decorationCells.append(contentsOf: rowData.decorationCells)
+                frameData!.underImageDraws.append(contentsOf: rowData.underImageDraws)
+                frameData!.placeholderImageDraws.append(contentsOf: rowData.placeholderImageDraws)
+                frameData!.overImageDraws.append(contentsOf: rowData.overImageDraws)
+                frameData!.otherImageDraws.append(contentsOf: rowData.otherImageDraws)
             }
         }
 #if DEBUG
@@ -860,6 +887,9 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         var placeholderImageDraws: [ImageDraw] = []
         var overImageDraws: [ImageDraw] = []
         var otherImageDraws: [ImageDraw] = []
+        backgroundCells.reserveCapacity(8)
+        glyphCellsGray.reserveCapacity(min(buffer.cols, 256))
+        decorationCells.reserveCapacity(4)
 
         let line = buffer.lines[row]
         let renderMode = line.renderMode
@@ -867,8 +897,6 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         let screenLineOriginY = (viewportHeightPx / scale) - lineOffset
         let lineOrigin = relativeToRow ? CGPoint.zero : CGPoint(x: 0, y: screenLineOriginY)
         let rowBase = lineOrigin.y + cellHeight
-        let lineInfo = terminalView.buildAttributedString(row: row, line: line, cols: buffer.cols)
-        let shapedSegments = buildShapedSegments(lineInfo.segments, terminalView: terminalView)
         let lineOriginPx = CGPoint(x: lineOrigin.x * scale, y: lineOrigin.y * scale)
         let cellWidthPx = cellWidth * scale
         let cellHeightPx = cellHeight * scale
@@ -898,6 +926,27 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
         let underlinePosition = terminalView.fontSet.underlinePosition()
         let underlineThickness = max(round(scale * terminalView.fontSet.underlineThickness()) / scale, 0.5)
         let decorationCellWidth = ceil(cellWidth)
+
+        if let fastData = buildFastAsciiRowDrawData(row: row,
+                                                    line: line,
+                                                    buffer: buffer,
+                                                    cellWidth: cellWidth,
+                                                    cellHeight: cellHeight,
+                                                    yOffset: yOffset,
+                                                    viewWidthPx: viewWidthPx,
+                                                    scale: scale,
+                                                    lineOrigin: lineOrigin,
+                                                    lineOriginPx: lineOriginPx,
+                                                    cellWidthPx: cellWidthPx,
+                                                    cellHeightPx: cellHeightPx,
+                                                    underlinePosition: underlinePosition,
+                                                    underlineThickness: underlineThickness,
+                                                    decorationCellWidth: decorationCellWidth) {
+            return fastData
+        }
+
+        let lineInfo = terminalView.buildAttributedString(row: row, line: line, cols: buffer.cols)
+        let shapedSegments = buildShapedSegments(lineInfo.segments, terminalView: terminalView)
 
         if !lineInfo.boxDrawings.isEmpty || !lineInfo.blockElements.isEmpty {
             let boxThicknessScale: CGFloat = 1.35
@@ -1394,6 +1443,319 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                            placeholderImageDraws: placeholderImageDraws,
                            overImageDraws: overImageDraws,
                            otherImageDraws: otherImageDraws)
+    }
+
+    private func buildFastAsciiRowDrawData(row: Int,
+                                           line: BufferLine,
+                                           buffer: Buffer,
+                                           cellWidth: CGFloat,
+                                           cellHeight: CGFloat,
+                                           yOffset: CGFloat,
+                                           viewWidthPx: CGFloat,
+                                           scale: CGFloat,
+                                           lineOrigin: CGPoint,
+                                           lineOriginPx: CGPoint,
+                                           cellWidthPx: CGFloat,
+                                           cellHeightPx: CGFloat,
+                                           underlinePosition: CGFloat,
+                                           underlineThickness: CGFloat,
+                                           decorationCellWidth: CGFloat) -> RowDrawData? {
+        guard let terminalView = terminalView else {
+            return nil
+        }
+        guard line.renderMode == .single else {
+            return nil
+        }
+        if let images = line.images, !images.isEmpty {
+            return nil
+        }
+        if terminalView.selection?.active == true || terminalView.linkHighlightRange != nil {
+            return nil
+        }
+
+        var backgroundCells: [ColorCell] = []
+        var glyphCellsGray: [TextCell] = []
+        var glyphCellsColor: [TextCell] = []
+        var decorationCells: [ColorCell] = []
+        backgroundCells.reserveCapacity(8)
+        glyphCellsGray.reserveCapacity(min(buffer.cols, 256))
+        decorationCells.reserveCapacity(4)
+
+        var currentAttribute: Attribute?
+        var currentStyle: FastResolvedAttributes?
+        var runStartColumn = 0
+
+        func appendBackground(from startColumn: Int, to endColumn: Int, style: FastResolvedAttributes) {
+            guard endColumn > startColumn else {
+                return
+            }
+            let x0 = lineOriginPx.x + CGFloat(startColumn) * cellWidthPx
+            var x1 = lineOriginPx.x + CGFloat(endColumn) * cellWidthPx
+            if endColumn >= buffer.cols && style.fillsTrailingMargin {
+                x1 = lineOriginPx.x + viewWidthPx
+            }
+            guard x1 > x0 else {
+                return
+            }
+            backgroundCells.append(makeColorCell(x0: Float(x0),
+                                                 y0: Float(lineOriginPx.y),
+                                                 x1: Float(x1),
+                                                 y1: Float(lineOriginPx.y + cellHeightPx),
+                                                 color: style.background))
+        }
+
+        func appendDecorations(column: Int, style: FastResolvedAttributes) {
+            let baseX = lineOrigin.x + cellWidth * CGFloat(column)
+            let x0 = baseX * scale
+            let x1 = (baseX + decorationCellWidth) * scale
+            let baseY = lineOrigin.y + yOffset
+            if style.underlineStyle != .none {
+                let metrics = underlineDecorationMetrics(thicknessPoints: underlineThickness, scale: scale)
+                let yCenter = (baseY + underlinePosition) * scale
+                let segmentStyle: UnderlineStyle = style.underlineStyle == .double ? .single : style.underlineStyle
+                appendUnderlineSegments(x0: x0,
+                                        x1: x1,
+                                        yCenter: yCenter,
+                                        metrics: metrics,
+                                        color: style.underlineColor,
+                                        style: segmentStyle,
+                                        renderMode: .single,
+                                        clipRect: nil,
+                                        pivotY: 0,
+                                        output: &decorationCells)
+                if style.underlineStyle == .double {
+                    let yDouble = (baseY + underlinePosition - underlineThickness - 1) * scale
+                    appendUnderlineSegments(x0: x0,
+                                            x1: x1,
+                                            yCenter: yDouble,
+                                            metrics: metrics,
+                                            color: style.underlineColor,
+                                            style: segmentStyle,
+                                            renderMode: .single,
+                                            clipRect: nil,
+                                            pivotY: 0,
+                                            output: &decorationCells)
+                }
+            }
+            if style.strikethroughStyle != .none {
+                let yCenter = (baseY + style.strikethroughPosition) * scale
+                appendUnderlineSegments(x0: x0,
+                                        x1: x1,
+                                        yCenter: yCenter,
+                                        metrics: style.strikethroughMetrics,
+                                        color: style.strikethroughColor,
+                                        style: style.strikethroughStyle,
+                                        renderMode: .single,
+                                        clipRect: nil,
+                                        pivotY: 0,
+                                        output: &decorationCells)
+            }
+        }
+
+        func switchStyleIfNeeded(_ attribute: Attribute, at column: Int) {
+            if currentAttribute == attribute {
+                return
+            }
+            if let style = currentStyle {
+                appendBackground(from: runStartColumn, to: column, style: style)
+            }
+            currentAttribute = attribute
+            currentStyle = resolveFastAttributes(for: attribute,
+                                                 terminalView: terminalView,
+                                                 scale: scale,
+                                                 underlineThickness: underlineThickness)
+            runStartColumn = column
+        }
+
+        var col = 0
+        while col < buffer.cols {
+            let ch = line[col]
+            guard ch.width == 1 else {
+                return nil
+            }
+            if ch.hasPayload {
+                return nil
+            }
+            let code = ch.code
+            if code != 0 && (code < 32 || code > 126) {
+                return nil
+            }
+            if terminalView.customBlockGlyphs,
+               code >= BoxDrawingRenderer.lowerBoundary,
+               code <= BoxDrawingRenderer.upperBoundary {
+                return nil
+            }
+            if terminalView.customBlockGlyphs,
+               code >= BlockElementMapping.lowerBoundary,
+               code <= BlockElementMapping.upperBoundary {
+                return nil
+            }
+
+            switchStyleIfNeeded(ch.attribute, at: col)
+            guard let style = currentStyle else {
+                return nil
+            }
+
+            if code != 0 && code != 32 {
+                let ctFont = style.font as CTFont
+                guard let glyph = fastGlyph(for: UInt16(code), font: ctFont) else {
+                    return nil
+                }
+                let scaledFont = scaledFontFor(font: ctFont, scale: scale)
+                guard let entry = glyphEntry(for: scaledFont, glyph: glyph) else {
+                    return nil
+                }
+                if entry.size.width > 0 && entry.size.height > 0 {
+                    let basePos = CGPoint(x: lineOrigin.x + (cellWidth * CGFloat(col)),
+                                          y: lineOrigin.y + yOffset)
+                    let rawPxX = basePos.x * scale + entry.bearing.x
+                    let rawPxY = basePos.y * scale + entry.bearing.y
+                    let pxX = entry.atlasKind == .grayscale ? round(rawPxX) : rawPxX
+                    let pxY = entry.atlasKind == .grayscale ? round(rawPxY) : rawPxY
+                    let x0 = Float(pxX)
+                    let y0 = Float(pxY)
+                    let x1 = x0 + Float(entry.size.width)
+                    let y1 = y0 + Float(entry.size.height)
+                    let atlasSize = entry.atlasKind == .color ? colorAtlas.size : grayscaleAtlas.size
+                    let u0 = Float(entry.region.x) / Float(atlasSize)
+                    let v0 = Float(entry.region.y) / Float(atlasSize)
+                    let u1 = Float(entry.region.x + entry.region.width) / Float(atlasSize)
+                    let v1 = Float(entry.region.y + entry.region.height) / Float(atlasSize)
+                    let color = entry.isColor ? SIMD4<Float>(1, 1, 1, 1) : style.foreground
+                    let cell = makeTextCell(x0: x0,
+                                            y0: y0,
+                                            x1: x1,
+                                            y1: y1,
+                                            u0: u0,
+                                            v0: v0,
+                                            u1: u1,
+                                            v1: v1,
+                                            color: color)
+                    switch entry.atlasKind {
+                    case .grayscale:
+                        glyphCellsGray.append(cell)
+                    case .color:
+                        glyphCellsColor.append(cell)
+                    }
+                }
+            }
+
+            appendDecorations(column: col, style: style)
+            col += 1
+        }
+
+        if let style = currentStyle {
+            appendBackground(from: runStartColumn, to: buffer.cols, style: style)
+        }
+
+        return RowDrawData(backgroundCells: backgroundCells,
+                           glyphCellsGray: glyphCellsGray,
+                           glyphCellsColor: glyphCellsColor,
+                           decorationCells: decorationCells,
+                           underImageDraws: [],
+                           placeholderImageDraws: [],
+                           overImageDraws: [],
+                           otherImageDraws: [])
+    }
+
+    private func resolveFastAttributes(for attribute: Attribute,
+                                       terminalView: TerminalView,
+                                       scale: CGFloat,
+                                       underlineThickness: CGFloat) -> FastResolvedAttributes {
+        if let cached = fastAttributeCache[attribute] {
+            return cached
+        }
+
+        let flags = attribute.style
+        var bg = attribute.bg
+        var fg = attribute.fg
+
+        if flags.contains(.inverse) {
+            swap(&bg, &fg)
+            if fg == .defaultColor {
+                fg = .defaultInvertedColor
+            }
+            if bg == .defaultColor {
+                bg = .defaultInvertedColor
+            }
+        }
+
+        var useBoldForBrightColor = false
+        if case .ansi256(let code) = fg, code > 7, !terminalView.useBrightColors {
+            useBoldForBrightColor = true
+        }
+        let isBold = flags.contains(.bold)
+        let font: TTFont
+        if isBold || useBoldForBrightColor {
+            font = flags.contains(.italic) ? terminalView.fontSet.boldItalic : terminalView.fontSet.bold
+        } else if flags.contains(.italic) {
+            font = terminalView.fontSet.italic
+        } else {
+            font = terminalView.fontSet.normal
+        }
+
+        var foregroundColor = terminalView.mapColor(color: fg,
+                                                    isFg: true,
+                                                    isBold: isBold,
+                                                    useBrightColors: terminalView.useBrightColors)
+        let backgroundColor = terminalView.mapColor(color: bg, isFg: false, isBold: false)
+        if flags.contains(.dim) {
+            foregroundColor = foregroundColor.dimmedColor(towards: backgroundColor)
+        }
+
+        let underlineStyle: UnderlineStyle
+        let underlineColor: TTColor
+        if flags.contains(.underline) {
+            underlineStyle = attribute.underlineStyle == .none ? .single : attribute.underlineStyle
+            underlineColor = attribute.underlineColor.map {
+                terminalView.mapColor(color: $0,
+                                      isFg: true,
+                                      isBold: isBold,
+                                      useBrightColors: terminalView.useBrightColors)
+            } ?? foregroundColor
+        } else {
+            underlineStyle = .none
+            underlineColor = foregroundColor
+        }
+
+        let ctFont = font as CTFont
+        let strikeThickness = max(round(scale * CTFontGetUnderlineThickness(ctFont)) / scale, 0.5)
+        let strikethroughStyle: UnderlineStyle = flags.contains(.crossedOut) ? .single : .none
+        let strikethroughPosition = (CTFontGetXHeight(ctFont) + strikeThickness) * 0.5
+
+        let resolved = FastResolvedAttributes(font: font,
+                                              foreground: colorToSIMD(foregroundColor),
+                                              background: colorToSIMD(backgroundColor),
+                                              fillsTrailingMargin: backgroundColor == terminalView.nativeBackgroundColor,
+                                              underlineStyle: underlineStyle,
+                                              underlineColor: colorToSIMD(underlineColor),
+                                              strikethroughStyle: strikethroughStyle,
+                                              strikethroughColor: colorToSIMD(foregroundColor),
+                                              strikethroughPosition: strikethroughPosition,
+                                              strikethroughMetrics: strikethroughDecorationMetrics(thicknessPoints: strikeThickness,
+                                                                                                  scale: scale))
+        if fastAttributeCache.count > 4096 {
+            fastAttributeCache.removeAll(keepingCapacity: true)
+        }
+        fastAttributeCache[attribute] = resolved
+        return resolved
+    }
+
+    private func fastGlyph(for scalar: UInt16, font: CTFont) -> CGGlyph? {
+        let key = FastGlyphKey(fontName: CTFontCopyPostScriptName(font) as String,
+                               size: CTFontGetSize(font),
+                               scalar: scalar)
+        if let cached = fastGlyphCache[key] {
+            return cached == 0 ? nil : cached
+        }
+        var character = UniChar(scalar)
+        var glyph = CGGlyph()
+        guard CTFontGetGlyphsForCharacters(font, &character, &glyph, 1), glyph != 0 else {
+            fastGlyphCache[key] = 0
+            return nil
+        }
+        fastGlyphCache[key] = glyph
+        return glyph
     }
 
     private func buildShapedSegments(_ segments: [ViewLineSegment], terminalView: TerminalView) -> [ShapedSegment] {

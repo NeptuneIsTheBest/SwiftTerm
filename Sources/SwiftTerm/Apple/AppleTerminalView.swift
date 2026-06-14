@@ -104,6 +104,9 @@ extension TerminalView {
     func resetFont()
     {
         resetCaches()
+#if canImport(MetalKit) && os(macOS)
+        bumpMetalRenderRevision()
+#endif
         self.cellDimension = computeFontDimensions ()
         if (frame.width > 0) && (frame.height > 0) {
             let newCols = Int(frame.width / cellDimension.width)
@@ -291,6 +294,9 @@ extension TerminalView {
     {
         urlAttributes = [:]
         attributes = [:]
+#if canImport(MetalKit) && os(macOS)
+        bumpMetalRenderRevision()
+#endif
         
         terminal.updateFullScreen ()
         queuePendingDisplay()
@@ -804,6 +810,11 @@ extension TerminalView {
         guard screenRow >= 0 && screenRow < terminal.rows else {
             return
         }
+#if canImport(MetalKit) && os(macOS)
+        if metalView != nil {
+            markMetalDirtyRange(bufferRow...bufferRow)
+        }
+#endif
         terminal.updateRange(borrowing: displayBuffer, screenRow)
     }
 
