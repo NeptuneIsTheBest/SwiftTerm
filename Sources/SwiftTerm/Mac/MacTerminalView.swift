@@ -146,14 +146,14 @@ open class TerminalView: NSView, NSTextInputClient, NSUserInterfaceValidations, 
     var metalRenderRevision: UInt64 = 0
     /// Controls how the Metal renderer builds GPU buffers each frame.
     ///
-    /// The default is ``MetalBufferingMode/perRowPersistent``, which caches
-    /// per-row vertex data and only rebuilds dirty rows. Switch to
-    /// ``MetalBufferingMode/perFrameAggregated`` for workloads that repaint
-    /// most of the screen every frame.
+    /// The default is ``MetalBufferingMode/automatic``, which lets the renderer
+    /// adapt between per-row caching and per-frame aggregation. Switch to
+    /// ``MetalBufferingMode/perRowPersistent`` or
+    /// ``MetalBufferingMode/perFrameAggregated`` to force a specific strategy.
     ///
     /// You can change this property at any time; the renderer picks up the
     /// new mode on the next frame.
-    public var metalBufferingMode: MetalBufferingMode = .perRowPersistent
+    public var metalBufferingMode: MetalBufferingMode = .automatic
 
     /// Overrides the backing scale used by the Metal renderer.
     ///

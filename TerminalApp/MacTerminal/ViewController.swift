@@ -116,7 +116,6 @@ class ViewController: NSViewController, LocalProcessTerminalViewDelegate, NSUser
     override func viewDidLoad() {
         super.viewDidLoad()
         terminal = LocalProcessTerminalView(frame: view.frame)
-        terminal.metalBufferingMode = .perFrameAggregated
         do {
             try terminal.setUseMetal(false)
         } catch {
@@ -281,8 +280,7 @@ class ViewController: NSViewController, LocalProcessTerminalViewDelegate, NSUser
 
     @objc @IBAction
     func toggleMetalBufferingMode(_ source: AnyObject) {
-        let current = terminal.metalBufferingMode
-        terminal.metalBufferingMode = (current == .perRowPersistent) ? .perFrameAggregated : .perRowPersistent
+        terminal.metalBufferingMode = nextMetalBufferingMode(after: terminal.metalBufferingMode)
         terminal.setNeedsDisplay(terminal.bounds)
     }
 
@@ -473,7 +471,8 @@ class ViewController: NSViewController, LocalProcessTerminalViewDelegate, NSUser
         }
         if item.action == #selector(toggleMetalBufferingMode(_:)) {
             if let m = item as? NSMenuItem {
-                m.state = terminal.metalBufferingMode == .perFrameAggregated ? .on : .off
+                m.title = metalBufferingMenuTitle(for: terminal.metalBufferingMode)
+                m.state = metalBufferingMenuState(for: terminal.metalBufferingMode)
             }
         }
         
@@ -492,6 +491,39 @@ class ViewController: NSViewController, LocalProcessTerminalViewDelegate, NSUser
             return .base16LabHarmonious
         case .base16LabHarmonious:
             return .xterm
+        }
+    }
+
+    private func nextMetalBufferingMode(after mode: MetalBufferingMode) -> MetalBufferingMode {
+        switch mode {
+        case .automatic:
+            return .perRowPersistent
+        case .perRowPersistent:
+            return .perFrameAggregated
+        case .perFrameAggregated:
+            return .automatic
+        }
+    }
+
+    private func metalBufferingMenuTitle(for mode: MetalBufferingMode) -> String {
+        switch mode {
+        case .automatic:
+            return "Metal Buffering: Automatic"
+        case .perRowPersistent:
+            return "Metal Buffering: Per Row"
+        case .perFrameAggregated:
+            return "Metal Buffering: Per Frame"
+        }
+    }
+
+    private func metalBufferingMenuState(for mode: MetalBufferingMode) -> NSControl.StateValue {
+        switch mode {
+        case .automatic:
+            return .off
+        case .perRowPersistent:
+            return .mixed
+        case .perFrameAggregated:
+            return .on
         }
     }
 

@@ -184,6 +184,13 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
     private static let profileLog = OSLog(subsystem: "org.tirania.SwiftTerm", category: "MetalProfile")
     private static let profileEnabled = ProcessInfo.processInfo.environment["SWIFTTERM_PROFILE"] == "1"
 #endif
+    private static let automaticDirtyRatioSmoothing = 0.25
+    private static let automaticNormalToFrameThreshold = 0.65
+    private static let automaticAltToFrameThreshold = 0.40
+    private static let automaticToRowThreshold = 0.18
+    private static let automaticLowRedrawFramesToRow = 8
+    private static let automaticSwitchCooldownFrames = 12
+
     private weak var terminalView: TerminalView?
     private weak var view: MTKView?
     private let device: MTLDevice
@@ -211,6 +218,11 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
     private var kittyTextureCache: [UInt32: (signature: KittyImageSignature, texture: MTLTexture)] = [:]
     private var rowCache: [Int: RowCacheEntry] = [:]
     private var cacheBufferingMode: MetalBufferingMode?
+    private var automaticBufferingMode: MetalBufferingMode = .perRowPersistent
+    private var automaticDirtyRatioEWMA: Double = 0
+    private var automaticLowRedrawFrames = 0
+    private var automaticSwitchCooldown = 0
+    private var lastRequestedBufferingMode: MetalBufferingMode?
     private var cacheSignature: CacheSignature?
     private var atlasResetDuringBuild = false
     private var atlasResetHandled = false
@@ -612,7 +624,14 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
                             cursorGlyphVerticesGray: [],
                             cursorGlyphVerticesColor: [])
         }
-        let bufferingMode = terminalView.metalBufferingMode
+        let requestedBufferingMode = terminalView.metalBufferingMode
+        if lastRequestedBufferingMode != requestedBufferingMode {
+            if requestedBufferingMode == .automatic {
+                resetAutomaticBufferingMode()
+            }
+            lastRequestedBufferingMode = requestedBufferingMode
+        }
+        let bufferingMode = effectiveBufferingMode(for: requestedBufferingMode)
         if cacheBufferingMode != bufferingMode {
             rowCache.removeAll()
             cacheBufferingMode = bufferingMode
@@ -806,10 +825,94 @@ final class MetalTerminalRenderer: NSObject, MTKViewDelegate {
             return buildDrawData(scale: scale, viewportSize: viewportSize)
         }
         atlasResetHandled = false
+        if requestedBufferingMode == .automatic {
+            updateAutomaticBufferingMode(visibleRange: visibleRange,
+                                         dirtyRange: dirtyRange,
+                                         needsFullRebuild: needsFullRebuild,
+                                         rebuiltRows: rebuiltRows,
+                                         isAlternateBuffer: isAltBuffer)
+        }
         if needsFullRebuild {
             terminalView.recordMetalSelectionRowsSnapshot(in: buffer)
         }
         return result
+    }
+
+    private func effectiveBufferingMode(for requestedMode: MetalBufferingMode) -> MetalBufferingMode {
+        switch requestedMode {
+        case .automatic:
+            switch automaticBufferingMode {
+            case .perRowPersistent, .perFrameAggregated:
+                return automaticBufferingMode
+            case .automatic:
+                resetAutomaticBufferingMode()
+                return .perRowPersistent
+            }
+        case .perRowPersistent, .perFrameAggregated:
+            return requestedMode
+        }
+    }
+
+    private func resetAutomaticBufferingMode() {
+        automaticBufferingMode = .perRowPersistent
+        automaticDirtyRatioEWMA = 0
+        automaticLowRedrawFrames = 0
+        automaticSwitchCooldown = 0
+    }
+
+    private func updateAutomaticBufferingMode(visibleRange: ClosedRange<Int>,
+                                              dirtyRange: ClosedRange<Int>?,
+                                              needsFullRebuild: Bool,
+                                              rebuiltRows: Int,
+                                              isAlternateBuffer: Bool) {
+        let visibleRows = max(1, visibleRange.upperBound - visibleRange.lowerBound + 1)
+        let markedDirtyRatio: Double
+        if needsFullRebuild {
+            markedDirtyRatio = 1
+        } else if let dirtyRange = intersect(dirtyRange, visibleRange) {
+            let dirtyRows = max(0, dirtyRange.upperBound - dirtyRange.lowerBound + 1)
+            markedDirtyRatio = min(1, Double(dirtyRows) / Double(visibleRows))
+        } else {
+            markedDirtyRatio = 0
+        }
+        let rebuiltRatio = min(1, Double(max(0, rebuiltRows)) / Double(visibleRows))
+        let dirtyRatio = max(markedDirtyRatio, rebuiltRatio)
+
+        let smoothing = MetalTerminalRenderer.automaticDirtyRatioSmoothing
+        automaticDirtyRatioEWMA = automaticDirtyRatioEWMA * (1 - smoothing) + dirtyRatio * smoothing
+
+        if automaticSwitchCooldown > 0 {
+            automaticSwitchCooldown -= 1
+            return
+        }
+
+        switch automaticBufferingMode {
+        case .perRowPersistent:
+            let threshold: Double
+            if isAlternateBuffer {
+                threshold = MetalTerminalRenderer.automaticAltToFrameThreshold
+            } else {
+                threshold = MetalTerminalRenderer.automaticNormalToFrameThreshold
+            }
+            if automaticDirtyRatioEWMA >= threshold {
+                automaticBufferingMode = .perFrameAggregated
+                automaticLowRedrawFrames = 0
+                automaticSwitchCooldown = MetalTerminalRenderer.automaticSwitchCooldownFrames
+            }
+        case .perFrameAggregated:
+            if automaticDirtyRatioEWMA <= MetalTerminalRenderer.automaticToRowThreshold {
+                automaticLowRedrawFrames += 1
+            } else {
+                automaticLowRedrawFrames = 0
+            }
+            if automaticLowRedrawFrames >= MetalTerminalRenderer.automaticLowRedrawFramesToRow {
+                automaticBufferingMode = .perRowPersistent
+                automaticLowRedrawFrames = 0
+                automaticSwitchCooldown = MetalTerminalRenderer.automaticSwitchCooldownFrames
+            }
+        case .automatic:
+            resetAutomaticBufferingMode()
+        }
     }
 
     private func intersect(_ range: ClosedRange<Int>?, _ other: ClosedRange<Int>) -> ClosedRange<Int>? {

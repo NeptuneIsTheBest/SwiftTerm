@@ -202,9 +202,9 @@ to the GPU. See <doc:GPURendering> for full details.
 // Enable Metal rendering
 try terminalView.setUseMetal(true)
 
-// Choose a buffering strategy
-terminalView.metalBufferingMode = .perRowPersistent   // default
-terminalView.metalBufferingMode = .perFrameAggregated // for full-screen TUIs
+// Optional: force a buffering strategy instead of the default automatic mode
+terminalView.metalBufferingMode = .perRowPersistent
+terminalView.metalBufferingMode = .perFrameAggregated
 
 // Check current renderer
 if terminalView.isUsingMetalRenderer {

@@ -4,6 +4,10 @@
 /// performance. You can change this at any time via
 /// ``TerminalView/metalBufferingMode``.
 public enum MetalBufferingMode {
+    /// The renderer chooses the buffering strategy dynamically based on recent
+    /// redraw behavior. This is the default.
+    case automatic
+
     /// Each terminal row's vertex data is cached independently and reused across
     /// frames. Only rows marked dirty are rebuilt, making this the best choice
     /// for typical interactive use where only a few rows change per frame.

@@ -50,13 +50,21 @@ builds and caches GPU buffers each frame:
 
 | Mode | Behavior | Best for |
 |------|----------|----------|
-| ``MetalBufferingMode/perRowPersistent`` (default) | Caches vertex data per row; only dirty rows are rebuilt each frame. | Interactive shells, editors, and typical terminal use. |
-| ``MetalBufferingMode/perFrameAggregated`` | Rebuilds all visible rows into a single buffer every frame. | Full-screen TUI apps that repaint most of the screen each frame. |
+| ``MetalBufferingMode/automatic`` (default) | Adapts between per-row caching and per-frame aggregation based on recent redraw density. | General use. |
+| ``MetalBufferingMode/perRowPersistent`` | Caches vertex data per row; only dirty rows are rebuilt each frame. | Forcing the strategy for interactive shells, editors, and typical terminal use. |
+| ``MetalBufferingMode/perFrameAggregated`` | Rebuilds all visible rows into a single buffer every frame. | Forcing the strategy for full-screen TUI apps that repaint most of the screen each frame. |
 
-Change the mode at any time — the renderer picks it up on the next frame:
+The automatic strategy starts with per-row caching, switches toward per-frame
+aggregation when a sustained high fraction of visible rows is redrawn, and
+switches back only after sustained low redraw activity. Alternate-screen
+applications need less redraw density to move into per-frame aggregation.
+
+Change or force the mode at any time — the renderer picks it up on the next
+frame:
 
 ```swift
-terminalView.metalBufferingMode = .perFrameAggregated
+terminalView.metalBufferingMode = .automatic
+terminalView.metalBufferingMode = .perFrameAggregated // force per-frame
 ```
 
 ## Environment Variables

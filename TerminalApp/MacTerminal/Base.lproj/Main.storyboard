@@ -405,7 +405,7 @@ GQ
                                                 <action selector="toggleMetalRenderer:" target="Ady-hI-5gd" id="QbO-bt-8ys"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Use Per-Frame Metal Buffering" id="dWc-9x-NlP">
+                                        <menuItem title="Metal Buffering: Automatic" id="dWc-9x-NlP">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>
                                                 <action selector="toggleMetalBufferingMode:" target="Ady-hI-5gd" id="Z7a-Rj-3vS"/>
